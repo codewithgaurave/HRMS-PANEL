@@ -1,11 +1,28 @@
 // src/components/Departments.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTheme } from "../context/ThemeContext";
 import departmentAPI from "../apis/departmentAPI";
 import CreateDepartmentModal from "./modals/CreateDepartmentModal";
 import UpdateDepartmentModal from "./modals/UpdateDepartmentModal";
 import { Eye, EyeOff, Edit, Trash2, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { calculatePageNumbers } from "../utils/paginationHelpers";
+
+// Debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 // Constants
 const DEPARTMENT_STATUS = {
@@ -34,6 +51,10 @@ const Departments = () => {
     limit: 10
   });
 
+  // Debounced search
+  const debouncedSearch = useDebounce(filters.search, 500);
+  const [isSearching, setIsSearching] = useState(false);
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -43,12 +64,17 @@ const Departments = () => {
   });
 
   // Fetch departments with filters
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsSearching(true);
       setError(null);
       
-      const { data } = await departmentAPI.getAll(filters);
+      const queryParams = {
+        ...filters,
+        search: debouncedSearch
+      };
+      
+      const { data } = await departmentAPI.getAll(queryParams);
       setDepartments(data.departments || []);
       setPagination(data.pagination || {});
 
@@ -56,9 +82,9 @@ const Departments = () => {
       setError(err.response?.data?.message || err.message || "Error fetching departments");
       console.error("Fetch departments error:", err);
     } finally {
-      setLoading(false);
+      setIsSearching(false);
     }
-  };
+  }, [debouncedSearch, filters.status, filters.sortBy, filters.sortOrder, filters.page, filters.limit]);
 
   // Handle filter changes
   const handleFilterChange = (key, value) => {
@@ -186,9 +212,29 @@ const Departments = () => {
     uniqueCreators: new Set(departments.map(dept => dept.createdBy?._id)).size
   }), [departments]);
 
+  // Initial load
   useEffect(() => {
-    fetchDepartments();
-  }, [filters]);
+    const initialLoad = async () => {
+      try {
+        setLoading(true);
+        const { data } = await departmentAPI.getAll({ page: 1, limit: 10, sortBy: "createdAt", sortOrder: "desc" });
+        setDepartments(data.departments || []);
+        setPagination(data.pagination || {});
+      } catch (err) {
+        setError(err.response?.data?.message || err.message || "Error fetching departments");
+      } finally {
+        setLoading(false);
+      }
+    };
+    initialLoad();
+  }, []);
+
+  // Filter changes
+  useEffect(() => {
+    if (!loading) {
+      fetchDepartments();
+    }
+  }, [fetchDepartments, loading]);
 
   if (loading && departments.length === 0) {
     return (
@@ -284,18 +330,25 @@ const Departments = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2">Search</label>
-            <input
-              type="text"
-              placeholder="Search by name or description..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-full p-2 rounded-md border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-opacity-50"
-              style={{ 
-                backgroundColor: themeColors.background, 
-                borderColor: themeColors.border, 
-                color: themeColors.text
-              }}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name or description..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full p-2 rounded-md border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-opacity-50 pr-8"
+                style={{ 
+                  backgroundColor: themeColors.background, 
+                  borderColor: themeColors.border, 
+                  color: themeColors.text
+                }}
+              />
+              {isSearching && (
+                <div className="absolute right-2 top-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>

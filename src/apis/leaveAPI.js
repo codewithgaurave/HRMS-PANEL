@@ -1,6 +1,7 @@
 import axios from 'axios';
+import apiRoutes from '../contants/api';
 
-const API_URL = 'http://localhost:5000/api/leaves';
+const API_URL = apiRoutes.leaves;
 
 const leaveAPI = {
   // Get my leaves

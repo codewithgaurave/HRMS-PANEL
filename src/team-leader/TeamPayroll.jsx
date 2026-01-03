@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import payrollAPI from "../apis/payrollAPI";
 import { DollarSign, Download, Eye } from "lucide-react";
+import PayrollDetailsModal from "../components/PayrollDetailsModal";
 
 const TeamPayroll = () => {
   const { themeColors } = useTheme();
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedPayroll, setSelectedPayroll] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -41,11 +44,16 @@ const TeamPayroll = () => {
   const handleViewPayroll = async (payrollId) => {
     try {
       const { data } = await payrollAPI.getById(payrollId);
-      // You can open a modal or navigate to detail page
-      alert(`Payroll Details:\nEmployee: ${data.payroll.employee?.name?.first} ${data.payroll.employee?.name?.last}\nNet Salary: ${formatCurrency(data.payroll.netSalary)}`);
+      setSelectedPayroll(data.payroll);
+      setIsModalOpen(true);
     } catch (err) {
       setError("Error viewing payroll details");
     }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedPayroll(null);
   };
 
   const handleDownloadSlip = async (payrollId) => {
@@ -260,6 +268,13 @@ const TeamPayroll = () => {
           <p className="text-xs mt-2" style={{ color: themeColors.textSecondary }}>Only your payroll and your team members' payroll will be displayed here</p>
         </div>
       )}
+
+      {/* Payroll Details Modal */}
+      <PayrollDetailsModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        payroll={selectedPayroll}
+      />
     </div>
   );
 };

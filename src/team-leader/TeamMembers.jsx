@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import employeeAPI from "../apis/employeeAPI";
 import { Eye, Mail, Phone } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import SimpleEmployeeModal from "../components/SimpleEmployeeModal";
 
 const TeamMembers = () => {
   const { themeColors } = useTheme();
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -28,7 +29,15 @@ const TeamMembers = () => {
   };
 
   const handleViewProfile = (id) => {
-    navigate(`/employee-profile/${id}`);
+    console.log('View Profile clicked for ID:', id);
+    setSelectedEmployeeId(id);
+    setIsModalOpen(true);
+    console.log('Modal state set to true');
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedEmployeeId(null);
   };
 
   if (loading) {
@@ -129,6 +138,13 @@ const TeamMembers = () => {
           <p style={{ color: themeColors.textSecondary }}>No team members found</p>
         </div>
       )}
+
+      {/* Employee Profile Modal */}
+      <SimpleEmployeeModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        employeeId={selectedEmployeeId}
+      />
     </div>
   );
 };

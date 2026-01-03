@@ -171,6 +171,12 @@ const employeeAPI = {
     axios.get(`${apiRoutes.employees}/without-filters`, {
       headers: getAuthHeader(),
     }),
+
+  // ----------------- FORM DATA -----------------
+  getFormData: () =>
+    axios.get(`${apiRoutes.employees}/form-data`, {
+      headers: getAuthHeader(),
+    }),
 };
 
 export default employeeAPI;

@@ -19,6 +19,23 @@ const payrollAPI = {
     return response;
   },
 
+  // Get HR team payrolls (specific for HR managers)
+  getHRTeamPayrolls: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    
+    const response = await axios.get(`${apiRoutes.payroll}/team/hr?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('hrms-token')}`
+      }
+    });
+    return response;
+  },
+
   // Get all payrolls (for employees to see their own)
   getAllPayrolls: async () => {
     const response = await axios.get(apiRoutes.payroll, {

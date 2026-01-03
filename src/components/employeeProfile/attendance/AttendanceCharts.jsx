@@ -37,10 +37,10 @@ const AttendanceCharts = ({ data, themeColors }) => {
             
             return (
               <div key={index} className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="w-12 sm:w-20 text-gray-600">
+                <span className="w-12 sm:w-20" style={{ color: themeColors.textSecondary }}>
                   {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
                 </span>
-                <div className="flex-1 mx-2 sm:mx-4 h-3 sm:h-4 bg-gray-200 rounded-full overflow-hidden">
+                <div className="flex-1 mx-2 sm:mx-4 h-3 sm:h-4 rounded-full overflow-hidden" style={{ backgroundColor: themeColors.border }}>
                   <div className="flex h-full">
                     {day.present > 0 && (
                       <div 
@@ -92,7 +92,7 @@ const AttendanceCharts = ({ data, themeColors }) => {
                   className="w-3 h-3 sm:w-4 sm:h-4 rounded-full"
                   style={{ backgroundColor: item.color }}
                 />
-                <span className="capitalize text-gray-700">
+                <span className="capitalize" style={{ color: themeColors.textSecondary }}>
                   {item.status.toLowerCase()}
                 </span>
               </div>
@@ -119,15 +119,16 @@ const AttendanceCharts = ({ data, themeColors }) => {
           <div className="space-y-2 sm:space-y-3">
             {weeklyTrend.slice(-4).map((week, index) => (
               <div key={index} className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="text-gray-600">
+                <span style={{ color: themeColors.textSecondary }}>
                   Week {week.week}
                 </span>
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <span className="text-gray-600 hidden sm:inline">
+                  <span className="hidden sm:inline" style={{ color: themeColors.textSecondary }}>
                     {week.present}/{week.total}
                   </span>
                   <div 
-                    className="w-16 sm:w-20 h-2 bg-gray-200 rounded-full overflow-hidden"
+                    className="w-16 sm:w-20 h-2 rounded-full overflow-hidden"
+                    style={{ backgroundColor: themeColors.border }}
                     title={`${week.attendanceRate}%`}
                   >
                     <div 
@@ -165,17 +166,17 @@ const AttendanceCharts = ({ data, themeColors }) => {
               const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
               return (
                 <div key={index} className="flex items-center justify-between text-xs sm:text-sm">
-                  <span className="text-gray-600">
+                  <span style={{ color: themeColors.textSecondary }}>
                     {monthNames[month.month - 1]} {month.year}
                   </span>
                   <div className="flex items-center gap-2 sm:gap-4">
-                    <span className="text-gray-600 hidden sm:inline">
+                    <span className="hidden sm:inline" style={{ color: themeColors.textSecondary }}>
                       {month.present}/{month.total}
                     </span>
                     <span className="font-semibold" style={{ color: themeColors.text }}>
                       {Math.round(month.attendanceRate)}%
                     </span>
-                    <span className="text-success hidden sm:inline">
+                    <span className="hidden sm:inline" style={{ color: themeColors.success }}>
                       {Math.round(month.totalHours)}h
                     </span>
                   </div>

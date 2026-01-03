@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTheme } from "../context/ThemeContext";
 import attendanceAPI from "../apis/attendanceAPI";
 import { getCurrentLocation } from "../utils/locationUtils";
@@ -14,12 +14,9 @@ import {
   XCircle,
   AlertCircle,
   TrendingUp,
-  Filter,
   RefreshCw,
-  Building,
-  Users as DepartmentsIcon,
-  Briefcase,
-  Navigation
+  Navigation,
+  Search
 } from "lucide-react";
 
 const Attendance = () => {
@@ -36,31 +33,13 @@ const Attendance = () => {
   const [myAttendance, setMyAttendance] = useState([]);
   const [allAttendance, setAllAttendance] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
-  const [filtersData, setFiltersData] = useState({
-    departments: [],
-    designations: [],
-    officeLocations: [],
-    shifts: [],
-    statusCounts: {}
-  });
 
-  // Enhanced Filter states
-  const [filters, setFilters] = useState({
-    search: "",
-    status: "All",
-    department: "All",
-    designation: "All",
-    officeLocation: "All",
-    shift: "All",
-    startDate: "",
-    endDate: "",
-    page: 1,
-    limit: 10,
-    sortBy: "date",
-    sortOrder: "desc"
-  });
+  // Frontend filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [departmentFilter, setDepartmentFilter] = useState("All");
+  const [designationFilter, setDesignationFilter] = useState("All");
 
-  // Location state
   const [currentLocation, setCurrentLocation] = useState(null);
 
   // Fetch current location
@@ -68,26 +47,14 @@ const Attendance = () => {
     try {
       setLocationLoading(true);
       setError(null);
-      
       const location = await getCurrentLocation();
       setCurrentLocation(location);
-      
       return location;
     } catch (err) {
       setError(`Location Error: ${err.message}`);
       return null;
     } finally {
       setLocationLoading(false);
-    }
-  };
-
-  // Fetch filters data
-  const fetchFiltersData = async () => {
-    try {
-      const { data } = await attendanceAPI.getAttendanceFilters();
-      setFiltersData(data.filters);
-    } catch (err) {
-      console.error("Error fetching filters data:", err);
     }
   };
 
@@ -111,13 +78,10 @@ const Attendance = () => {
       };
 
       const { data } = await attendanceAPI.punchIn(punchInData);
-      
       setTodayAttendance(data.attendance);
       setSuccess("Punch in successful!");
       
-      // Refresh today's attendance
       fetchTodayAttendance();
-      
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Punch in failed");
     } finally {
@@ -145,14 +109,11 @@ const Attendance = () => {
       };
 
       const { data } = await attendanceAPI.punchOut(punchOutData);
-      
       setTodayAttendance(data.attendance);
       setSuccess("Punch out successful!");
       
-      // Refresh today's attendance and summary
       fetchTodayAttendance();
       fetchAttendanceSummary();
-      
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Punch out failed");
     } finally {
@@ -174,7 +135,7 @@ const Attendance = () => {
   const fetchMyAttendance = async () => {
     try {
       setLoading(true);
-      const { data } = await attendanceAPI.getMyAttendance(filters);
+      const { data } = await attendanceAPI.getMyAttendance();
       setMyAttendance(data.attendances || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching attendance records");
@@ -187,10 +148,7 @@ const Attendance = () => {
   const fetchAllAttendance = async () => {
     try {
       setLoading(true);
-      const { data } = await attendanceAPI.getAttendance({
-        ...filters,
-        employeeId: "" // Empty to get all
-      });
+      const { data } = await attendanceAPI.getAttendance();
       setAllAttendance(data.attendance || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching all attendance");
@@ -209,41 +167,13 @@ const Attendance = () => {
     }
   };
 
-  // Handle filter changes
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: 1
-    }));
-  };
-
-  // Clear all filters
-  const clearFilters = () => {
-    setFilters({
-      search: "",
-      status: "All",
-      department: "All",
-      designation: "All",
-      officeLocation: "All",
-      shift: "All",
-      startDate: "",
-      endDate: "",
-      page: 1,
-      limit: 10,
-      sortBy: "date",
-      sortOrder: "desc"
-    });
-  };
-
   const handlePageRefresh = async () => {
     setLoading(true);
     await Promise.all([
       fetchAllAttendance(),
       fetchAttendanceSummary(),
       fetchMyAttendance(),
-      fetchTodayAttendance(),
-      fetchFiltersData()
+      fetchTodayAttendance()
     ]);
     clearFilters();
     setLoading(false);
@@ -322,9 +252,77 @@ const Attendance = () => {
     }
   };
 
-  // Get filter count badge
-  const getFilterCount = (status) => {
-    return filtersData.statusCounts[status] || 0;
+  // Get unique departments from all attendance data
+  const departments = useMemo(() => {
+    const depts = allAttendance
+      .map(record => record.employee?.department?.name)
+      .filter(dept => dept)
+      .filter((dept, index, arr) => arr.indexOf(dept) === index);
+    return depts;
+  }, [allAttendance]);
+
+  // Get unique designations from all attendance data
+  const designations = useMemo(() => {
+    const desigs = allAttendance
+      .map(record => record.employee?.designation?.title)
+      .filter(desig => desig)
+      .filter((desig, index, arr) => arr.indexOf(desig) === index);
+    return desigs;
+  }, [allAttendance]);
+
+  // Get unique statuses from data
+  const statuses = useMemo(() => {
+    const currentRecords = activeTab === "myAttendance" ? myAttendance : allAttendance;
+    const statusList = currentRecords
+      .map(record => record.status)
+      .filter(status => status)
+      .filter((status, index, arr) => arr.indexOf(status) === index);
+    return statusList;
+  }, [myAttendance, allAttendance, activeTab]);
+
+  // Frontend filtering
+  const filteredRecords = useMemo(() => {
+    const currentRecords = activeTab === "myAttendance" ? myAttendance : allAttendance;
+    
+    return currentRecords.filter(record => {
+      // Search filter
+      if (searchTerm && activeTab === "allAttendance") {
+        const employeeName = formatEmployeeName(record.employee).toLowerCase();
+        const employeeId = record.employee?.employeeId?.toLowerCase() || "";
+        const searchLower = searchTerm.toLowerCase();
+        
+        if (!employeeName.includes(searchLower) && !employeeId.includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      // Status filter
+      if (statusFilter !== "All" && record.status !== statusFilter) {
+        return false;
+      }
+      
+      // Department filter (only for all attendance)
+      if (activeTab === "allAttendance" && departmentFilter !== "All" && 
+          record.employee?.department?.name !== departmentFilter) {
+        return false;
+      }
+      
+      // Designation filter (only for all attendance)
+      if (activeTab === "allAttendance" && designationFilter !== "All" && 
+          record.employee?.designation?.title !== designationFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [myAttendance, allAttendance, activeTab, searchTerm, statusFilter, departmentFilter, designationFilter]);
+
+  // Clear filters
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("All");
+    setDepartmentFilter("All");
+    setDesignationFilter("All");
   };
 
   // Initialize component
@@ -332,17 +330,16 @@ const Attendance = () => {
     fetchCurrentLocation();
     fetchTodayAttendance();
     fetchAttendanceSummary();
-    fetchFiltersData();
   }, []);
 
-  // Fetch data when filters or active tab changes
+  // Fetch data when active tab changes
   useEffect(() => {
     if (activeTab === "myAttendance") {
       fetchMyAttendance();
     } else if (activeTab === "allAttendance") {
       fetchAllAttendance();
     }
-  }, [filters, activeTab]);
+  }, [activeTab]);
 
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -355,7 +352,7 @@ const Attendance = () => {
     }
   }, [error, success]);
 
-  const currentAttendance = activeTab === "myAttendance" ? myAttendance : allAttendance;
+  const currentAttendance = filteredRecords;
 
   return (
     <div className="space-y-6 p-4" style={{ color: themeColors.text }}>
@@ -369,18 +366,6 @@ const Attendance = () => {
           </p>
         </div>
         <div className="flex gap-3 mt-4 md:mt-0">
-          <button
-            onClick={clearFilters}
-            className="px-4 py-2 rounded-lg border font-medium transition-colors hover:opacity-90 flex items-center gap-2"
-            style={{
-              backgroundColor: themeColors.background,
-              borderColor: themeColors.border,
-              color: themeColors.text
-            }}
-          >
-            <Filter size={16} />
-            Clear Filters
-          </button>
           <button
             onClick={handlePageRefresh}
             disabled={loading}
@@ -646,33 +631,38 @@ const Attendance = () => {
           </div>
         </div>
 
-        {/* Enhanced Filters Section */}
+        {/* Filters Section */}
         <div className="p-4 border-b" style={{ borderColor: themeColors.border }}>
           <h3 className="text-lg font-semibold mb-4">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Search */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Search Employee</label>
-              <input
-                type="text"
-                placeholder="Search by name or ID..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              />
-            </div>
+            {activeTab === "allAttendance" && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Search Employee</label>
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: themeColors.textSecondary }} />
+                  <input
+                    type="text"
+                    placeholder="Search by name or ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 rounded-md border text-sm"
+                    style={{ 
+                      backgroundColor: themeColors.background, 
+                      borderColor: themeColors.border, 
+                      color: themeColors.text 
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
-            {/* Status Filter with Counts */}
+            {/* Status Filter */}
             <div>
               <label className="block text-sm font-medium mb-2">Status</label>
               <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 rounded-md border text-sm"
                 style={{ 
                   backgroundColor: themeColors.background, 
@@ -681,143 +671,68 @@ const Attendance = () => {
                 }}
               >
                 <option value="All">All Status</option>
-                <option value="Present">Present ({getFilterCount('Present')})</option>
-                <option value="Late">Late ({getFilterCount('Late')})</option>
-                <option value="Early Departure">Early Departure ({getFilterCount('Early Departure')})</option>
-                <option value="Half Day">Half Day ({getFilterCount('Half Day')})</option>
-                <option value="Absent">Absent ({getFilterCount('Absent')})</option>
-                <option value="On Leave">On Leave ({getFilterCount('On Leave')})</option>
+                {statuses.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </div>
 
             {/* Department Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                <DepartmentsIcon size={14} className="inline mr-1" />
-                Department
-              </label>
-              <select
-                value={filters.department}
-                onChange={(e) => handleFilterChange('department', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              >
-                <option value="All">All Departments</option>
-                {filtersData.departments.map(dept => (
-                  <option key={dept._id} value={dept._id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {activeTab === "allAttendance" && departments.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Department</label>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="w-full p-2 rounded-md border text-sm"
+                  style={{ 
+                    backgroundColor: themeColors.background, 
+                    borderColor: themeColors.border, 
+                    color: themeColors.text 
+                  }}
+                >
+                  <option value="All">All Departments</option>
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Designation Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                <Briefcase size={14} className="inline mr-1" />
-                Designation
-              </label>
-              <select
-                value={filters.designation}
-                onChange={(e) => handleFilterChange('designation', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
+            {activeTab === "allAttendance" && designations.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Designation</label>
+                <select
+                  value={designationFilter}
+                  onChange={(e) => setDesignationFilter(e.target.value)}
+                  className="w-full p-2 rounded-md border text-sm"
+                  style={{ 
+                    backgroundColor: themeColors.background, 
+                    borderColor: themeColors.border, 
+                    color: themeColors.text 
+                  }}
+                >
+                  <option value="All">All Designations</option>
+                  {designations.map(desig => (
+                    <option key={desig} value={desig}>{desig}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex items-end">
+              <button
+                onClick={clearFilters}
+                className="w-full px-4 py-2 rounded-lg border font-medium transition-colors hover:opacity-90 text-sm"
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                  color: themeColors.text
                 }}
               >
-                <option value="All">All Designations</option>
-                {filtersData.designations.map(desig => (
-                  <option key={desig._id} value={desig._id}>
-                    {desig.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Office Location Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                <Building size={14} className="inline mr-1" />
-                Office Location
-              </label>
-              <select
-                value={filters.officeLocation}
-                onChange={(e) => handleFilterChange('officeLocation', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              >
-                <option value="All">All Locations</option>
-                {filtersData.officeLocations.map(loc => (
-                  <option key={loc._id} value={loc._id}>
-                    {loc.officeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Shift Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                <Clock size={14} className="inline mr-1" />
-                Work Shift
-              </label>
-              <select
-                value={filters.shift}
-                onChange={(e) => handleFilterChange('shift', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              >
-                <option value="All">All Shifts</option>
-                {filtersData.shifts.map(shift => (
-                  <option key={shift._id} value={shift._id}>
-                    {shift.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Range Filters */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Start Date</label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              />
+                Clear Filters
+              </button>
             </div>
           </div>
         </div>
@@ -831,8 +746,28 @@ const Attendance = () => {
           ) : currentAttendance.length === 0 ? (
             <div className="text-center py-8" style={{ color: themeColors.textSecondary }}>
               <Clock size={48} className="mx-auto mb-4 opacity-50" />
-              <p>No attendance records found</p>
-              <p className="text-sm mt-1">Try adjusting your filters</p>
+              {searchTerm ? (
+                <div>
+                  <p>No results found for "{searchTerm}"</p>
+                  <p className="text-sm mt-1">Try a different search term</p>
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="mt-3 px-4 py-2 rounded-lg border font-medium transition-colors hover:opacity-90 text-sm"
+                    style={{
+                      backgroundColor: themeColors.background,
+                      borderColor: themeColors.border,
+                      color: themeColors.text
+                    }}
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p>No attendance records found</p>
+                  <p className="text-sm mt-1">No attendance records available</p>
+                </div>
+              )}
             </div>
           ) : viewMode === "list" ? (
             /* List View */
@@ -843,9 +778,9 @@ const Attendance = () => {
                     <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
                       Date
                     </th>
-                        <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
-                          Employee
-                        </th>
+                    <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
+                      Employee
+                    </th>
                     {activeTab === "allAttendance" && (
                       <>
                         <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
@@ -879,14 +814,14 @@ const Attendance = () => {
                       <td className="p-3 text-sm">
                         {formatDate(attendance.date)}
                       </td>
-                          <td className="p-3 text-sm">
-                            <div className="font-medium">
-                              {formatEmployeeName(attendance.employee)}
-                            </div>
-                            <div className="text-xs" style={{ color: themeColors.textSecondary }}>
-                              {attendance.employee?.employeeId || ''}
-                            </div>
-                          </td>
+                      <td className="p-3 text-sm">
+                        <div className="font-medium">
+                          {formatEmployeeName(attendance.employee)}
+                        </div>
+                        <div className="text-xs" style={{ color: themeColors.textSecondary }}>
+                          {attendance.employee?.employeeId || ''}
+                        </div>
+                      </td>
                       {activeTab === "allAttendance" && (
                         <>
                           <td className="p-3 text-sm">

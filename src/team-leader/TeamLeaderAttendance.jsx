@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTheme } from "../context/ThemeContext";
 import attendanceAPI from "../apis/attendanceAPI";
 import { getCurrentLocation } from "../utils/locationUtils";
@@ -11,16 +11,16 @@ import {
   CheckCircle,
   AlertCircle,
   TrendingUp,
-  Filter,
   RefreshCw,
   Navigation,
   List,
-  Grid
+  Grid,
+  Search
 } from "lucide-react";
 
 const TeamLeaderAttendance = () => {
   const { themeColors } = useTheme();
-  const [activeTab, setActiveTab] = useState("myAttendance"); // myAttendance, teamAttendance
+  const [activeTab, setActiveTab] = useState("myAttendance");
   const [viewMode, setViewMode] = useState("list");
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -33,27 +33,10 @@ const TeamLeaderAttendance = () => {
   const [teamAttendanceRecords, setTeamAttendanceRecords] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
 
-  // Filter states
-  const [myFilters, setMyFilters] = useState({
-    startDate: "",
-    endDate: "",
-    status: "All",
-    page: 1,
-    limit: 20,
-    sortBy: "date",
-    sortOrder: "desc"
-  });
-
-  const [teamFilters, setTeamFilters] = useState({
-    startDate: "",
-    endDate: "",
-    status: "All",
-    search: "",
-    page: 1,
-    limit: 20,
-    sortBy: "date",
-    sortOrder: "desc"
-  });
+  // Frontend filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [departmentFilter, setDepartmentFilter] = useState("All");
 
   const [currentLocation, setCurrentLocation] = useState(null);
 
@@ -158,7 +141,7 @@ const TeamLeaderAttendance = () => {
   const fetchMyAttendance = async () => {
     try {
       setLoading(true);
-      const { data } = await attendanceAPI.getMyAttendance(myFilters);
+      const { data } = await attendanceAPI.getMyAttendance();
       setMyAttendanceRecords(data.attendances || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching records");
@@ -171,14 +154,20 @@ const TeamLeaderAttendance = () => {
   const fetchTeamAttendance = async () => {
     try {
       setLoading(true);
-      // Use main attendance endpoint - backend will filter based on role
-      const { data } = await attendanceAPI.getAttendance(teamFilters);
-      setTeamAttendanceRecords(data.attendance || []);
+      setError(null);
+      
+      let response;
+      try {
+        response = await attendanceAPI.getTeamAttendance();
+      } catch (teamErr) {
+        response = await attendanceAPI.getAttendance();
+      }
+      
+      setTeamAttendanceRecords(response.data.attendance || []);
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Error fetching team records";
       setError(errorMessage);
       
-      // If access denied, show specific message
       if (err.response?.status === 403) {
         setError("Access denied. You can only view attendance of your team members.");
       }
@@ -200,8 +189,7 @@ const TeamLeaderAttendance = () => {
   // Fetch team summary
   const fetchTeamSummary = async () => {
     try {
-      // Use main summary endpoint - backend will filter based on role
-      const { data } = await attendanceAPI.getAttendanceSummary();
+      const { data } = await attendanceAPI.getTeamAttendanceSummary();
       setAttendanceSummary(data.summary);
     } catch (err) {
       console.error("Error fetching team summary:", err);
@@ -278,49 +266,61 @@ const TeamLeaderAttendance = () => {
     }
   };
 
-  // Handle my filter change
-  const handleMyFilterChange = (key, value) => {
-    setMyFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: 1
-    }));
-  };
+  // Get unique departments from team data
+  const departments = useMemo(() => {
+    const depts = teamAttendanceRecords
+      .map(record => record.employee?.department?.name)
+      .filter(dept => dept)
+      .filter((dept, index, arr) => arr.indexOf(dept) === index);
+    return depts;
+  }, [teamAttendanceRecords]);
 
-  // Handle team filter change
-  const handleTeamFilterChange = (key, value) => {
-    setTeamFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: 1
-    }));
-  };
+  // Get unique statuses from data
+  const statuses = useMemo(() => {
+    const currentRecords = activeTab === "myAttendance" ? myAttendanceRecords : teamAttendanceRecords;
+    const statusList = currentRecords
+      .map(record => record.status)
+      .filter(status => status)
+      .filter((status, index, arr) => arr.indexOf(status) === index);
+    return statusList;
+  }, [myAttendanceRecords, teamAttendanceRecords, activeTab]);
 
-  // Clear my filters
-  const clearMyFilters = () => {
-    setMyFilters({
-      startDate: "",
-      endDate: "",
-      status: "All",
-      page: 1,
-      limit: 20,
-      sortBy: "date",
-      sortOrder: "desc"
+  // Frontend filtering
+  const filteredRecords = useMemo(() => {
+    const currentRecords = activeTab === "myAttendance" ? myAttendanceRecords : teamAttendanceRecords;
+    
+    return currentRecords.filter(record => {
+      // Search filter
+      if (searchTerm && activeTab === "teamAttendance") {
+        const employeeName = formatEmployeeName(record.employee).toLowerCase();
+        const employeeId = record.employee?.employeeId?.toLowerCase() || "";
+        const searchLower = searchTerm.toLowerCase();
+        
+        if (!employeeName.includes(searchLower) && !employeeId.includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      // Status filter
+      if (statusFilter !== "All" && record.status !== statusFilter) {
+        return false;
+      }
+      
+      // Department filter (only for team attendance)
+      if (activeTab === "teamAttendance" && departmentFilter !== "All" && 
+          record.employee?.department?.name !== departmentFilter) {
+        return false;
+      }
+      
+      return true;
     });
-  };
+  }, [myAttendanceRecords, teamAttendanceRecords, activeTab, searchTerm, statusFilter, departmentFilter]);
 
-  // Clear team filters
-  const clearTeamFilters = () => {
-    setTeamFilters({
-      startDate: "",
-      endDate: "",
-      status: "All",
-      search: "",
-      page: 1,
-      limit: 20,
-      sortBy: "date",
-      sortOrder: "desc"
-    });
+  // Clear filters
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("All");
+    setDepartmentFilter("All");
   };
 
   // Initialize
@@ -339,14 +339,14 @@ const TeamLeaderAttendance = () => {
     }
   }, [activeTab]);
 
-  // Fetch records when filters or tab change
+  // Fetch records when tab changes
   useEffect(() => {
     if (activeTab === "myAttendance") {
       fetchMyAttendance();
     } else {
       fetchTeamAttendance();
     }
-  }, [myFilters, teamFilters, activeTab]);
+  }, [activeTab]);
 
   // Clear messages
   useEffect(() => {
@@ -359,8 +359,7 @@ const TeamLeaderAttendance = () => {
     }
   }, [error, success]);
 
-  const currentRecords = activeTab === "myAttendance" ? myAttendanceRecords : teamAttendanceRecords;
-  const currentFilters = activeTab === "myAttendance" ? myFilters : teamFilters;
+  const currentRecords = filteredRecords;
 
   return (
     <div className="space-y-6 p-4" style={{ color: themeColors.text }}>
@@ -652,29 +651,29 @@ const TeamLeaderAttendance = () => {
             {activeTab === "teamAttendance" && (
               <div>
                 <label className="block text-xs font-medium mb-2">Search Employee</label>
-                <input
-                  type="text"
-                  placeholder="Search by name or ID..."
-                  value={teamFilters.search}
-                  onChange={(e) => handleTeamFilterChange('search', e.target.value)}
-                  className="w-full p-2 rounded-md border text-sm"
-                  style={{ 
-                    backgroundColor: themeColors.background, 
-                    borderColor: themeColors.border, 
-                    color: themeColors.text 
-                  }}
-                />
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: themeColors.textSecondary }} />
+                  <input
+                    type="text"
+                    placeholder="Search by name or ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 rounded-md border text-sm"
+                    style={{ 
+                      backgroundColor: themeColors.background, 
+                      borderColor: themeColors.border, 
+                      color: themeColors.text 
+                    }}
+                  />
+                </div>
               </div>
             )}
 
             <div>
               <label className="block text-xs font-medium mb-2">Status</label>
               <select
-                value={currentFilters.status}
-                onChange={(e) => activeTab === "myAttendance" 
-                  ? handleMyFilterChange('status', e.target.value)
-                  : handleTeamFilterChange('status', e.target.value)
-                }
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 rounded-md border text-sm"
                 style={{ 
                   backgroundColor: themeColors.background, 
@@ -683,63 +682,44 @@ const TeamLeaderAttendance = () => {
                 }}
               >
                 <option value="All">All Status</option>
-                <option value="Present">Present</option>
-                <option value="Late">Late</option>
-                <option value="Early Departure">Early Departure</option>
-                <option value="Half Day">Half Day</option>
-                <option value="Absent">Absent</option>
-                <option value="On Leave">On Leave</option>
+                {statuses.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium mb-2">Start Date</label>
-              <input
-                type="date"
-                value={currentFilters.startDate}
-                onChange={(e) => activeTab === "myAttendance" 
-                  ? handleMyFilterChange('startDate', e.target.value)
-                  : handleTeamFilterChange('startDate', e.target.value)
-                }
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              />
-            </div>
+            {activeTab === "teamAttendance" && departments.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium mb-2">Department</label>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="w-full p-2 rounded-md border text-sm"
+                  style={{ 
+                    backgroundColor: themeColors.background, 
+                    borderColor: themeColors.border, 
+                    color: themeColors.text 
+                  }}
+                >
+                  <option value="All">All Departments</option>
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-medium mb-2">End Date</label>
-              <input
-                type="date"
-                value={currentFilters.endDate}
-                onChange={(e) => activeTab === "myAttendance" 
-                  ? handleMyFilterChange('endDate', e.target.value)
-                  : handleTeamFilterChange('endDate', e.target.value)
-                }
-                className="w-full p-2 rounded-md border text-sm"
-                style={{ 
-                  backgroundColor: themeColors.background, 
-                  borderColor: themeColors.border, 
-                  color: themeColors.text 
-                }}
-              />
-            </div>
-
-            <div className="flex items-end gap-2">
+            <div className="flex items-end">
               <button
-                onClick={activeTab === "myAttendance" ? clearMyFilters : clearTeamFilters}
-                className="flex-1 px-4 py-2 rounded-lg border font-medium transition-colors hover:opacity-90 text-sm"
+                onClick={clearFilters}
+                className="w-full px-4 py-2 rounded-lg border font-medium transition-colors hover:opacity-90 text-sm"
                 style={{
                   backgroundColor: themeColors.background,
                   borderColor: themeColors.border,
                   color: themeColors.text
                 }}
               >
-                <Filter size={14} className="inline mr-1" />
-                Clear
+                Clear Filters
               </button>
             </div>
           </div>
@@ -749,16 +729,41 @@ const TeamLeaderAttendance = () => {
         <div className="p-4">
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+                <p className="text-sm" style={{ color: themeColors.textSecondary }}>
+                  Loading attendance records...
+                </p>
+              </div>
             </div>
           ) : currentRecords.length === 0 ? (
             <div className="text-center py-8" style={{ color: themeColors.textSecondary }}>
               <Clock size={48} className="mx-auto mb-4 opacity-50" />
-              <p>No attendance records found</p>
-              {activeTab === "teamAttendance" ? (
-                <p className="text-sm mt-1">Your team members haven't marked attendance yet</p>
+              {searchTerm ? (
+                <div>
+                  <p>No results found for "{searchTerm}"</p>
+                  <p className="text-sm mt-1">Try a different search term</p>
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="mt-3 px-4 py-2 rounded-lg border font-medium transition-colors hover:opacity-90 text-sm"
+                    style={{
+                      backgroundColor: themeColors.background,
+                      borderColor: themeColors.border,
+                      color: themeColors.text
+                    }}
+                  >
+                    Clear Search
+                  </button>
+                </div>
               ) : (
-                <p className="text-sm mt-1">Try adjusting your filters</p>
+                <div>
+                  <p>No attendance records found</p>
+                  {activeTab === "teamAttendance" ? (
+                    <p className="text-sm mt-1">Your team members haven't marked attendance yet</p>
+                  ) : (
+                    <p className="text-sm mt-1">No attendance records available</p>
+                  )}
+                </div>
               )}
             </div>
           ) : viewMode === "list" ? (

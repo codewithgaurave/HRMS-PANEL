@@ -1,7 +1,8 @@
 // src/pages/Dashboard.jsx
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import dashboardAPI from "../apis/dashboardAPI";
+import enhancedDashboardAPI from "../apis/enhancedDashboardAPI";
 import attendanceAPI from "../apis/attendanceAPI";
 import { getCurrentLocation } from "../utils/locationUtils";
 import { toast } from "sonner";
@@ -18,25 +19,16 @@ import {
   MapPin,
   Navigation,
   LogIn,
-  LogOut
+  LogOut,
+  Package,
+  IndianRupee,
+  AlertTriangle,
+  CheckCircle
 } from "lucide-react";
 
-// Chart components
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
+// Highcharts components
+import Highcharts from 'highcharts';
+import HighchartsReact from 'highcharts-react-official';
 
 const Dashboard = () => {
   const { themeColors } = useTheme();
@@ -68,16 +60,32 @@ const Dashboard = () => {
     try {
       setLoading(true);
       console.log('Fetching dashboard data...');
-      const [statsResponse, analyticsResponse] = await Promise.all([
-        dashboardAPI.getDashboardStats(),
-        dashboardAPI.getDashboardAnalytics('month')
-      ]);
       
-      console.log('Stats response:', statsResponse.data);
-      console.log('Analytics response:', analyticsResponse.data);
+      // Use enhanced dashboard for HR, regular dashboard for others
+      try {
+        const enhancedResponse = await enhancedDashboardAPI.getEnhancedHRStats();
+        console.log('Enhanced HR stats response:', enhancedResponse);
+        setStats(enhancedResponse);
+        
+        // Also get analytics for charts
+        const analyticsResponse = await dashboardAPI.getDashboardAnalytics('month').catch(() => ({ data: { analytics: {} } }));
+        setAnalytics(analyticsResponse.data.analytics || {});
+      } catch (enhancedError) {
+        console.log('Enhanced dashboard failed, using regular dashboard:', enhancedError);
+        
+        // Fallback to regular dashboard for role-based data
+        const [statsResponse, analyticsResponse] = await Promise.all([
+          dashboardAPI.getDashboardStats(),
+          dashboardAPI.getDashboardAnalytics('month').catch(() => ({ data: { analytics: {} } }))
+        ]);
+        
+        console.log('Regular dashboard stats response:', statsResponse.data);
+        console.log('User role:', statsResponse.data.userRole);
+        
+        setStats(statsResponse.data.stats);
+        setAnalytics(analyticsResponse.data.analytics || {});
+      }
       
-      setStats(statsResponse.data.stats);
-      setAnalytics(analyticsResponse.data.analytics);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(err.response?.data?.message || "Failed to fetch dashboard data");
@@ -178,12 +186,124 @@ const Dashboard = () => {
     );
   }
 
-  if (!stats || !analytics) return null;
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+      </div>
+    );
+  }
 
-  // Prepare chart data from API
-  const attendanceTrendData = analytics.attendanceTrend || [];
-  const departmentDistributionData = analytics.departmentDistribution || [];
-  const leaveTrendData = analytics.leaveTrend || [];
+  // Prepare chart data from API with safe defaults
+  const attendanceTrendData = analytics?.attendanceTrend || [];
+  const departmentDistributionData = analytics?.departmentDistribution || [];
+  const leaveTrendData = analytics?.leaveTrend || [];
+
+  // Safe access to stats with defaults - handle enhanced dashboard structure
+  const safeStats = {
+    overview: {
+      totalEmployees: stats.data?.overview?.totalEmployees || stats.overview?.totalEmployees || stats.overview?.teamSize || 1,
+      activeEmployees: stats.data?.overview?.activeEmployees || stats.overview?.activeEmployees || stats.overview?.activeTeamMembers || 1,
+      inactiveEmployees: stats.data?.overview?.inactiveEmployees || stats.overview?.inactiveEmployees || 0,
+      newEmployeesThisMonth: stats.data?.overview?.newEmployeesThisMonth || stats.overview?.newEmployeesThisMonth || 0,
+      pendingLeaves: stats.data?.overview?.pendingLeaves || stats.overview?.pendingLeaves || 0,
+      employeeGrowth: stats.data?.overview?.employeeGrowth || stats.overview?.employeeGrowth || 0,
+      totalAssets: stats.data?.overview?.totalAssets || stats.overview?.totalAssets || 0,
+      assignedAssets: stats.data?.overview?.assignedAssets || stats.overview?.assignedAssets || 0,
+      availableAssets: stats.data?.overview?.availableAssets || stats.overview?.availableAssets || 0,
+      // Team Leader specific fields
+      teamSize: Math.max(stats.overview?.teamSize || 0, 1),
+      activeTeamMembers: Math.max(stats.overview?.activeTeamMembers || 0, 1),
+      todayPresent: stats.overview?.todayPresent || 0,
+      todayAbsent: stats.overview?.todayAbsent || 0,
+      approvedLeaves: stats.overview?.approvedLeaves || 0,
+      rejectedLeaves: stats.overview?.rejectedLeaves || 0,
+      totalSalaryBudget: stats.overview?.totalSalaryBudget || 0,
+      avgTeamSalary: stats.overview?.avgTeamSalary || 0
+    },
+    attendance: {
+      today: {
+        present: stats.data?.attendance?.today?.present || stats.attendance?.today?.present || 0,
+        absent: stats.data?.attendance?.today?.absent || stats.attendance?.today?.absent || 0,
+        late: stats.data?.attendance?.today?.late || stats.attendance?.today?.late || 0,
+        halfDay: stats.data?.attendance?.today?.halfDay || stats.attendance?.today?.halfDay || 0,
+        rate: stats.data?.attendance?.today?.rate || stats.attendance?.today?.rate || 0,
+        totalEmployees: stats.data?.attendance?.today?.totalEmployees || stats.attendance?.today?.totalEmployees || 0
+      },
+      week: {
+        present: stats.data?.attendance?.week?.present || stats.attendance?.week?.present || 0,
+        absent: stats.data?.attendance?.week?.absent || stats.attendance?.week?.absent || 0,
+        late: stats.data?.attendance?.week?.late || stats.attendance?.week?.late || 0,
+        halfDay: stats.data?.attendance?.week?.halfDay || stats.attendance?.week?.halfDay || 0,
+        rate: stats.data?.attendance?.week?.rate || stats.attendance?.week?.rate || 0,
+        totalEmployees: stats.data?.attendance?.week?.totalEmployees || stats.attendance?.week?.totalEmployees || 0
+      },
+      month: {
+        present: stats.data?.attendance?.month?.present || stats.attendance?.month?.present || 0,
+        absent: stats.data?.attendance?.month?.absent || stats.attendance?.month?.absent || 0,
+        late: stats.data?.attendance?.month?.late || stats.attendance?.month?.late || 0,
+        halfDay: stats.data?.attendance?.month?.halfDay || stats.attendance?.month?.halfDay || 0,
+        rate: stats.data?.attendance?.month?.rate || stats.attendance?.month?.rate || 0,
+        totalEmployees: stats.data?.attendance?.month?.totalEmployees || stats.attendance?.month?.totalEmployees || 0
+      },
+      trends: stats.data?.attendance?.trends || stats.attendance?.trends || []
+    },
+    leaves: {
+      pending: stats.data?.leaves?.pending || stats.leaves?.pending || 0,
+      approvedThisMonth: stats.data?.leaves?.approvedThisMonth || stats.leaves?.approvedThisMonth || 0,
+      rejectedThisMonth: stats.data?.leaves?.rejectedThisMonth || stats.leaves?.rejectedThisMonth || 0,
+      byType: stats.data?.leaves?.byType || stats.leaves?.byType || [],
+      trends: stats.data?.leaves?.trends || stats.leaves?.trends || [],
+      approvalRate: stats.data?.leaves?.approvalRate || stats.leaves?.approvalRate || 0
+    },
+    assets: {
+      total: stats.data?.assets?.total || stats.assets?.total || 0,
+      assigned: stats.data?.assets?.assigned || stats.assets?.assigned || 0,
+      available: stats.data?.assets?.available || stats.assets?.available || 0,
+      pendingRequests: stats.data?.assets?.pendingRequests || stats.assets?.pendingRequests || 0,
+      byCategory: stats.data?.assets?.byCategory || stats.assets?.byCategory || [],
+      utilizationRate: stats.data?.assets?.utilizationRate || stats.assets?.utilizationRate || 0
+    },
+    payroll: {
+      totalThisMonth: stats.data?.payroll?.totalThisMonth || stats.payroll?.totalThisMonth || 0,
+      avgSalary: stats.data?.payroll?.avgSalary || stats.payroll?.avgSalary || 0,
+      salaryDistribution: stats.data?.payroll?.salaryDistribution || stats.payroll?.salaryDistribution || []
+    },
+    departments: {
+      stats: stats.data?.departments?.stats || stats.departments?.stats || [],
+      topPerforming: stats.data?.departments?.topPerforming || stats.departments?.topPerforming || [],
+      attendanceByDept: stats.data?.departments?.attendanceByDept || stats.departments?.attendanceByDept || []
+    },
+    workforce: {
+      roleDistribution: stats.data?.workforce?.roleDistribution || stats.workforce?.roleDistribution || [],
+      designationStats: stats.data?.workforce?.designationStats || stats.workforce?.designationStats || [],
+      locationStats: stats.data?.workforce?.locationStats || stats.workforce?.locationStats || [],
+      shiftStats: stats.data?.workforce?.shiftStats || stats.workforce?.shiftStats || []
+    },
+    performance: {
+      overtimeStats: stats.data?.performance?.overtimeStats || stats.performance?.overtimeStats || { totalOvertime: 0, avgOvertime: 0, employeesWithOvertime: 0 },
+      avgWorkHours: stats.data?.performance?.avgWorkHours || stats.performance?.avgWorkHours || 0,
+      productivityScore: stats.data?.performance?.productivityScore || stats.performance?.productivityScore || 0
+    },
+    recentActivities: {
+      newEmployees: stats.data?.recentActivities?.newEmployees || stats.recentActivities?.newEmployees || [],
+      recentLeaves: stats.data?.recentActivities?.recentLeaves || stats.recentActivities?.recentLeaves || [],
+      upcomingEvents: stats.data?.recentActivities?.upcomingEvents || stats.recentActivities?.upcomingEvents || [],
+      recentAnnouncements: stats.data?.recentActivities?.recentAnnouncements || stats.recentActivities?.recentAnnouncements || []
+    },
+    alerts: stats.data?.alerts || stats.alerts || [],
+    // Team Leader specific data
+    teamMembers: stats.teamMembers || [],
+    teamStats: stats.teamStats || {
+      totalMembers: 0,
+      activeMembers: 0,
+      departments: 0,
+      designations: 0,
+      salaryBudget: 0,
+      avgSalary: 0,
+      salaryRange: { min: 0, max: 0 }
+    }
+  };
 
   // Format time for display
   const formatTime = (dateString) => {
@@ -456,85 +576,106 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Enhanced Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatCard
           icon={<Users size={24} />}
-          title="Total Employees"
-          value={stats.overview.totalEmployees}
-          change={stats.overview.employeeGrowth}
-          subtitle={`${stats.overview.activeEmployees} active`}
+          title={safeStats.overview.teamSize > 0 ? "Team Size" : "Total Employees"}
+          value={safeStats.overview.teamSize > 0 ? safeStats.overview.teamSize : safeStats.overview.totalEmployees}
+          change={safeStats.overview.employeeGrowth}
+          subtitle={safeStats.overview.teamSize > 0 
+            ? `${safeStats.overview.activeTeamMembers} active members` 
+            : `${safeStats.overview.activeEmployees} active, ${safeStats.overview.inactiveEmployees} inactive`}
           color="blue"
         />
         <StatCard
           icon={<Calendar size={24} />}
           title="Today's Attendance"
-          value={`${stats.attendance.today.rate}%`}
-          change={stats.attendance.today.change}
-          subtitle={`${stats.attendance.today.present} present`}
+          value={`${safeStats.attendance.today.rate}%`}
+          change={0}
+          subtitle={`${safeStats.attendance.today.present} present, ${safeStats.attendance.today.late} late`}
           color="green"
         />
         <StatCard
           icon={<Building size={24} />}
           title="Pending Leaves"
-          value={stats.overview.pendingLeaves}
-          change={stats.overview.leaveChange}
-          subtitle="Requires approval"
+          value={safeStats.leaves.pending}
+          change={0}
+          subtitle={safeStats.overview.teamSize > 0 
+            ? `Team leave requests` 
+            : `${safeStats.leaves.approvalRate}% approval rate`}
           color="orange"
         />
         <StatCard
-          icon={<TrendingUp size={24} />}
-          title="Monthly Average"
-          value={`${stats.quickStats.averageAttendance}%`}
-          change={stats.quickStats.attendanceChange}
-          subtitle="Attendance rate"
+          icon={<Package size={24} />}
+          title="Assets"
+          value={safeStats.assets.total}
+          change={safeStats.assets.utilizationRate}
+          subtitle={`${safeStats.assets.assigned} assigned, ${safeStats.assets.available} available`}
           color="purple"
+        />
+        <StatCard
+          icon={<IndianRupee size={24} />}
+          title={safeStats.overview.teamSize > 0 ? "Team Salary Budget" : "Avg Salary"}
+          value={safeStats.overview.teamSize > 0 
+            ? `₹${Math.round(safeStats.overview.totalSalaryBudget || 0).toLocaleString()}` 
+            : `₹${Math.round(safeStats.payroll.avgSalary).toLocaleString()}`}
+          change={0}
+          subtitle={safeStats.overview.teamSize > 0 
+            ? `₹${Math.round(safeStats.overview.avgTeamSalary || 0).toLocaleString()} avg` 
+            : `₹${Math.round(safeStats.payroll.totalThisMonth).toLocaleString()} total`}
+          color="green"
         />
       </div>
 
-      {/* Charts Section */}
+      {/* Enhanced Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <QuickStatCard
+          title="Monthly Attendance"
+          value={`${safeStats.attendance.month.rate}%`}
+          change={0}
+          icon={<TrendingUp size={20} />}
+          color={themeColors.success}
+        />
+        <QuickStatCard
+          title="Avg Work Hours"
+          value={`${safeStats.performance.avgWorkHours}h`}
+          change={0}
+          icon={<Clock size={20} />}
+          color={themeColors.info}
+        />
+        <QuickStatCard
+          title="Overtime Hours"
+          value={`${safeStats.performance.overtimeStats.totalOvertime}h`}
+          change={0}
+          icon={<BarChart3 size={20} />}
+          color={themeColors.warning}
+        />
+        <QuickStatCard
+          title="Productivity Score"
+          value={`${safeStats.performance.productivityScore}%`}
+          change={0}
+          icon={<CheckCircle size={20} />}
+          color={themeColors.primary}
+        />
+      </div>
+
+      {/* Enhanced Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Attendance Trend Chart */}
         <ChartCard 
           title="Attendance Trend (Last 30 Days)"
           style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}
         >
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={attendanceTrendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={themeColors.border} />
-              <XAxis 
-                dataKey="date" 
-                stroke={themeColors.textSecondary}
-                fontSize={12}
-              />
-              <YAxis 
-                stroke={themeColors.textSecondary}
-                fontSize={12}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: themeColors.surface,
-                  borderColor: themeColors.border,
-                  color: themeColors.text
-                }}
-              />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="present" 
-                stroke={themeColors.success} 
-                strokeWidth={2}
-                name="Present"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="absent" 
-                stroke={themeColors.danger} 
-                strokeWidth={2}
-                name="Absent"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div style={{ height: '300px' }}>
+            {safeStats.attendance.trends && safeStats.attendance.trends.length > 0 ? (
+              <AttendanceTrendChart data={safeStats.attendance.trends} themeColors={themeColors} />
+            ) : (
+              <div className="flex items-center justify-center h-full" style={{ color: themeColors.text }}>
+                <p>No attendance trend data available</p>
+              </div>
+            )}
+          </div>
         </ChartCard>
 
         {/* Department Distribution */}
@@ -542,35 +683,59 @@ const Dashboard = () => {
           title="Department Distribution"
           style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}
         >
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={departmentDistributionData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {departmentDistributionData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={getDepartmentColor(index, themeColors)} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: themeColors.surface,
-                  borderColor: themeColors.border,
-                  color: themeColors.text
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          <div style={{ height: '300px' }}>
+            {safeStats.departments.stats && safeStats.departments.stats.length > 0 ? (
+              <DepartmentDistributionChart data={safeStats.departments.stats} themeColors={themeColors} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full" style={{ color: themeColors.text }}>
+                <div className="text-center">
+                  <div className="mb-4">
+                    <Building size={48} style={{ color: themeColors.text, opacity: 0.5 }} className="mx-auto" />
+                  </div>
+                  <p className="text-lg font-medium mb-2">No Department Data</p>
+                  <p className="text-sm opacity-75">Department distribution will appear here once employees are assigned to departments.</p>
+                </div>
+              </div>
+            )}
+          </div>
         </ChartCard>
       </div>
 
-      {/* Detailed Stats Section */}
+      {/* Leave Analytics Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ChartCard 
+          title="Leave Trends (Last 6 Months)"
+          style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}
+        >
+          <div style={{ height: '300px' }}>
+            {safeStats.leaves.trends && safeStats.leaves.trends.length > 0 ? (
+              <LeaveTrendChart data={safeStats.leaves.trends} themeColors={themeColors} />
+            ) : (
+              <div className="flex items-center justify-center h-full" style={{ color: themeColors.text }}>
+                <p>No leave trend data available</p>
+              </div>
+            )}
+          </div>
+        </ChartCard>
+
+        {/* Asset Distribution */}
+        <ChartCard 
+          title="Asset Distribution by Category"
+          style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}
+        >
+          <div style={{ height: '300px' }}>
+            {safeStats.assets.byCategory && safeStats.assets.byCategory.length > 0 ? (
+              <AssetDistributionChart data={safeStats.assets.byCategory} themeColors={themeColors} />
+            ) : (
+              <div className="flex items-center justify-center h-full" style={{ color: themeColors.text }}>
+                <p>No asset data available</p>
+              </div>
+            )}
+          </div>
+        </ChartCard>
+      </div>
+
+      {/* Enhanced Detailed Stats Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Attendance Breakdown */}
         <div className="p-6 rounded-lg border" style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}>
@@ -578,26 +743,26 @@ const Dashboard = () => {
           <div className="space-y-4">
             <AttendanceProgress 
               status="Present" 
-              count={stats.attendance.today.present} 
-              total={stats.overview.totalEmployees}
+              count={safeStats.attendance.today.present} 
+              total={safeStats.attendance.today.totalEmployees}
               color={themeColors.success}
             />
             <AttendanceProgress 
               status="Absent" 
-              count={stats.attendance.today.absent} 
-              total={stats.overview.totalEmployees}
+              count={safeStats.attendance.today.absent} 
+              total={safeStats.attendance.today.totalEmployees}
               color={themeColors.danger}
             />
             <AttendanceProgress 
               status="Late" 
-              count={stats.attendance.today.late} 
-              total={stats.overview.totalEmployees}
+              count={safeStats.attendance.today.late} 
+              total={safeStats.attendance.today.totalEmployees}
               color={themeColors.warning}
             />
             <AttendanceProgress 
               status="Half Day" 
-              count={stats.attendance.today.halfDay} 
-              total={stats.overview.totalEmployees}
+              count={safeStats.attendance.today.halfDay} 
+              total={safeStats.attendance.today.totalEmployees}
               color={themeColors.info}
             />
           </div>
@@ -607,64 +772,192 @@ const Dashboard = () => {
         <div className="p-6 rounded-lg border" style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}>
           <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.text }}>Department Performance</h3>
           <div className="space-y-4">
-            {(stats.analytics?.departmentStats || []).slice(0, 4).map((dept, index) => (
+            {safeStats.departments.topPerforming.slice(0, 4).map((dept, index) => (
               <DepartmentPerformance 
                 key={dept.department} 
                 department={dept}
                 color={getDepartmentColor(index, themeColors)}
               />
             ))}
+            {safeStats.departments.topPerforming.length === 0 && (
+              <p className="text-sm text-center py-4" style={{ color: themeColors.text }}>
+                No department performance data available
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Enhanced Quick Stats */}
         <div className="p-6 rounded-lg border" style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}>
-          <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.text }}>Quick Stats</h3>
+          <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.text }}>Performance Metrics</h3>
           <div className="space-y-4">
             <QuickStat 
-              title="Average Hours Worked" 
-              value={`${stats.quickStats.avgHoursWorked}h`}
-              change={stats.quickStats.hoursChange}
+              title="Average Work Hours" 
+              value={`${safeStats.performance.avgWorkHours}h`}
+              change={0}
             />
             <QuickStat 
-              title="Overtime This Month" 
-              value={`${stats.quickStats.overtimeHours}h`}
-              change={stats.quickStats.overtimeChange}
+              title="Total Overtime" 
+              value={`${safeStats.performance.overtimeStats.totalOvertime}h`}
+              change={0}
             />
             <QuickStat 
-              title="Leave Utilization" 
-              value={`${stats.quickStats.leaveUtilization}%`}
-              change={stats.quickStats.leaveUtilizationChange}
+              title="Employees with Overtime" 
+              value={safeStats.performance.overtimeStats.employeesWithOvertime}
+              change={0}
             />
             <QuickStat 
-              title="Remote Workers" 
-              value={stats.quickStats.remoteWorkers}
-              change={stats.quickStats.remoteChange}
+              title="Productivity Score" 
+              value={`${safeStats.performance.productivityScore}%`}
+              change={0}
             />
           </div>
         </div>
       </div>
 
-      {/* Recent Activities */}
+      {/* Enhanced Recent Activities */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentActivities 
-          title="Pending Approvals" 
-          activities={stats.recentActivities?.pendingLeaves || []} 
-          type="leaves"
-          maxItems={5}
+        <EnhancedRecentActivities 
+          title="Recent Activities" 
+          activities={[
+            ...safeStats.recentActivities.newEmployees.map(emp => ({
+              type: 'employee',
+              title: `New Employee: ${emp.name?.first} ${emp.name?.last}`,
+              subtitle: `${emp.department} - ${emp.designation}`,
+              date: emp.dateOfJoining,
+              icon: <Users size={16} />
+            })),
+            ...safeStats.recentActivities.recentLeaves.map(leave => ({
+              type: 'leave',
+              title: `Leave Request: ${leave.employee?.name?.first} ${leave.employee?.name?.last}`,
+              subtitle: `${leave.leaveType} - ${leave.status}`,
+              date: leave.startDate,
+              icon: <Calendar size={16} />
+            }))
+          ].slice(0, 5)}
         />
-        <RecentActivities 
+        <EnhancedRecentActivities 
           title="System Alerts" 
-          activities={stats.recentActivities?.systemAlerts || []} 
-          type="alerts"
-          maxItems={5}
+          activities={safeStats.alerts.map(alert => ({
+            type: alert.type,
+            title: alert.message,
+            subtitle: alert.action,
+            date: alert.timestamp,
+            severity: alert.severity,
+            icon: <AlertTriangle size={16} />
+          }))}
         />
+      </div>
+
+      {/* Data Tables Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Department Stats Table */}
+        <div className="p-6 rounded-lg border" style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}>
+          <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.text }}>Department Statistics</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b" style={{ borderColor: themeColors.border }}>
+                  <th className="text-left py-2" style={{ color: themeColors.text }}>Department</th>
+                  <th className="text-right py-2" style={{ color: themeColors.text }}>Employees</th>
+                  <th className="text-right py-2" style={{ color: themeColors.text }}>Avg Salary</th>
+                  <th className="text-right py-2" style={{ color: themeColors.text }}>Total Salary</th>
+                </tr>
+              </thead>
+              <tbody>
+                {safeStats.departments.stats.map((dept, index) => (
+                  <tr key={index} className="border-b" style={{ borderColor: themeColors.border }}>
+                    <td className="py-2" style={{ color: themeColors.text }}>{dept._id}</td>
+                    <td className="text-right py-2" style={{ color: themeColors.text }}>{dept.count}</td>
+                    <td className="text-right py-2" style={{ color: themeColors.text }}>₹{Math.round(dept.avgSalary || 0).toLocaleString()}</td>
+                    <td className="text-right py-2" style={{ color: themeColors.text }}>₹{Math.round(dept.totalSalary || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {safeStats.departments.stats.length === 0 && (
+              <p className="text-center py-4" style={{ color: themeColors.text }}>No department data available</p>
+            )}
+          </div>
+        </div>
+
+        {/* Leave Statistics Table */}
+        <div className="p-6 rounded-lg border" style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}>
+          <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.text }}>Leave Statistics</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="p-3 rounded" style={{ backgroundColor: themeColors.background }}>
+                <div className="text-lg font-bold" style={{ color: themeColors.text }}>{safeStats.leaves.pending}</div>
+                <div className="text-xs" style={{ color: themeColors.text }}>Pending</div>
+              </div>
+              <div className="p-3 rounded" style={{ backgroundColor: themeColors.background }}>
+                <div className="text-lg font-bold" style={{ color: themeColors.text }}>{safeStats.leaves.approvedThisMonth}</div>
+                <div className="text-xs" style={{ color: themeColors.text }}>Approved</div>
+              </div>
+              <div className="p-3 rounded" style={{ backgroundColor: themeColors.background }}>
+                <div className="text-lg font-bold" style={{ color: themeColors.text }}>{safeStats.leaves.rejectedThisMonth}</div>
+                <div className="text-xs" style={{ color: themeColors.text }}>Rejected</div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: themeColors.border }}>
+                    <th className="text-left py-2" style={{ color: themeColors.text }}>Leave Type</th>
+                    <th className="text-right py-2" style={{ color: themeColors.text }}>Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {safeStats.leaves.byType.map((leave, index) => (
+                    <tr key={index} className="border-b" style={{ borderColor: themeColors.border }}>
+                      <td className="py-2" style={{ color: themeColors.text }}>{leave._id}</td>
+                      <td className="text-right py-2" style={{ color: themeColors.text }}>{leave.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 // Helper Components
+const QuickStatCard = ({ title, value, change, icon, color }) => {
+  const { themeColors } = useTheme();
+  const isPositive = change && parseFloat(change) > 0;
+
+  return (
+    <div className="p-4 rounded-lg border" style={{ 
+      backgroundColor: themeColors.surface, 
+      borderColor: themeColors.border 
+    }}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="p-2 rounded-lg" style={{ backgroundColor: color + '20' }}>
+          <div style={{ color: color }}>
+            {icon}
+          </div>
+        </div>
+        {change && (
+          <div className={`flex items-center text-xs font-medium px-2 py-1 rounded-full`} style={{
+            backgroundColor: isPositive ? themeColors.success + '20' : themeColors.danger + '20',
+            color: isPositive ? themeColors.success : themeColors.danger,
+          }}>
+            {isPositive ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+            {Math.abs(parseFloat(change))}%
+          </div>
+        )}
+      </div>
+      <div>
+        <p className="text-lg font-bold" style={{ color: themeColors.text }}>{value}</p>
+        <p className="text-sm" style={{ color: themeColors.textSecondary }}>{title}</p>
+      </div>
+    </div>
+  );
+};
+
 const StatCard = ({ icon, title, value, subtitle, change, color }) => {
   const { themeColors } = useTheme();
   
@@ -835,6 +1128,290 @@ const RecentActivities = ({ title, activities, type, maxItems = 3 }) => {
           </div>
         ))}
         {safeActivities.length === 0 && (
+          <p className="text-sm text-center py-4" style={{ color: themeColors.text }}>
+            No activities found
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Memoized chart options to prevent re-renders
+const AttendanceTrendChart = React.memo(({ data, themeColors }) => {
+  const options = React.useMemo(() => {
+    const categories = data.map(item => {
+      const date = new Date(item._id);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const presentData = data.map(item => item.present || 0);
+    const absentData = data.map(item => item.absent || 0);
+    const lateData = data.map(item => item.late || 0);
+
+    return {
+      chart: {
+        type: 'line',
+        backgroundColor: 'transparent',
+        height: 300
+      },
+      title: { text: null },
+      xAxis: {
+        categories: categories,
+        labels: { style: { color: themeColors.text } },
+        lineColor: themeColors.border,
+        tickColor: themeColors.border
+      },
+      yAxis: {
+        title: { text: 'Count', style: { color: themeColors.text } },
+        labels: { style: { color: themeColors.text } },
+        gridLineColor: themeColors.border
+      },
+      legend: { itemStyle: { color: themeColors.text } },
+      tooltip: {
+        backgroundColor: themeColors.surface,
+        borderColor: themeColors.border,
+        style: { color: themeColors.text }
+      },
+      series: [
+        {
+          name: 'Present',
+          data: presentData,
+          color: themeColors.success,
+          lineWidth: 2
+        },
+        {
+          name: 'Absent',
+          data: absentData,
+          color: themeColors.danger,
+          lineWidth: 2
+        },
+        {
+          name: 'Late',
+          data: lateData,
+          color: themeColors.warning,
+          lineWidth: 2
+        }
+      ],
+      accessibility: { enabled: false },
+      credits: { enabled: false }
+    };
+  }, [data, themeColors]);
+
+  return <HighchartsReact highcharts={Highcharts} options={options} />;
+});
+
+const DepartmentDistributionChart = React.memo(({ data, themeColors }) => {
+  const options = React.useMemo(() => {
+    const colors = [
+      themeColors.primary, themeColors.success, themeColors.warning,
+      themeColors.danger, themeColors.info, '#8B5CF6', '#06B6D4',
+      '#84CC16', '#F97316', '#EC4899'
+    ];
+
+    const pieData = data.map((item, index) => ({
+      name: item._id || `Department ${index + 1}`,
+      y: item.count || 0,
+      color: colors[index % colors.length]
+    }));
+
+    return {
+      chart: {
+        type: 'pie',
+        backgroundColor: 'transparent',
+        height: 300
+      },
+      title: { text: null },
+      tooltip: {
+        backgroundColor: themeColors.surface,
+        borderColor: themeColors.border,
+        style: { color: themeColors.text },
+        pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b><br/>Count: <b>{point.y}</b>'
+      },
+      plotOptions: {
+        pie: {
+          allowPointSelect: true,
+          cursor: 'pointer',
+          dataLabels: {
+            enabled: true,
+            format: '<b>{point.name}</b>: {point.percentage:.1f}%',
+            style: { color: themeColors.text }
+          },
+          showInLegend: true
+        }
+      },
+      legend: { itemStyle: { color: themeColors.text } },
+      series: [{
+        name: 'Employees',
+        colorByPoint: true,
+        data: pieData
+      }],
+      accessibility: { enabled: false },
+      credits: { enabled: false }
+    };
+  }, [data, themeColors]);
+
+  return <HighchartsReact highcharts={Highcharts} options={options} />;
+});
+
+const LeaveTrendChart = React.memo(({ data, themeColors }) => {
+  const options = React.useMemo(() => {
+    const categories = data.map(item => {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${monthNames[item._id.month - 1]} ${item._id.year}`;
+    });
+    const pendingData = data.map(item => item.pending || 0);
+    const approvedData = data.map(item => item.approved || 0);
+    const rejectedData = data.map(item => item.rejected || 0);
+
+    return {
+      chart: {
+        type: 'column',
+        backgroundColor: 'transparent',
+        height: 300
+      },
+      title: { text: null },
+      xAxis: {
+        categories: categories,
+        labels: { style: { color: themeColors.text } },
+        lineColor: themeColors.border,
+        tickColor: themeColors.border
+      },
+      yAxis: {
+        title: { text: 'Leave Count', style: { color: themeColors.text } },
+        labels: { style: { color: themeColors.text } },
+        gridLineColor: themeColors.border
+      },
+      legend: { itemStyle: { color: themeColors.text } },
+      tooltip: {
+        backgroundColor: themeColors.surface,
+        borderColor: themeColors.border,
+        style: { color: themeColors.text }
+      },
+      series: [
+        {
+          name: 'Pending',
+          data: pendingData,
+          color: themeColors.warning
+        },
+        {
+          name: 'Approved',
+          data: approvedData,
+          color: themeColors.success
+        },
+        {
+          name: 'Rejected',
+          data: rejectedData,
+          color: themeColors.danger
+        }
+      ],
+      accessibility: { enabled: false },
+      credits: { enabled: false }
+    };
+  }, [data, themeColors]);
+
+  return <HighchartsReact highcharts={Highcharts} options={options} />;
+});
+
+const AssetDistributionChart = React.memo(({ data, themeColors }) => {
+  const options = React.useMemo(() => {
+    const colors = [
+      themeColors.primary, themeColors.success, themeColors.warning,
+      themeColors.danger, themeColors.info, '#8B5CF6'
+    ];
+
+    const pieData = data.map((item, index) => ({
+      name: item._id || `Category ${index + 1}`,
+      y: item.count || 0,
+      color: colors[index % colors.length]
+    }));
+
+    return {
+      chart: {
+        type: 'pie',
+        backgroundColor: 'transparent',
+        height: 300
+      },
+      title: { text: null },
+      tooltip: {
+        backgroundColor: themeColors.surface,
+        borderColor: themeColors.border,
+        style: { color: themeColors.text },
+        pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b><br/>Count: <b>{point.y}</b>'
+      },
+      plotOptions: {
+        pie: {
+          allowPointSelect: true,
+          cursor: 'pointer',
+          dataLabels: {
+            enabled: true,
+            format: '<b>{point.name}</b>: {point.y}',
+            style: { color: themeColors.text }
+          },
+          showInLegend: true,
+          innerSize: '50%'
+        }
+      },
+      legend: { itemStyle: { color: themeColors.text } },
+      series: [{
+        name: 'Assets',
+        colorByPoint: true,
+        data: pieData
+      }],
+      accessibility: { enabled: false },
+      credits: { enabled: false }
+    };
+  }, [data, themeColors]);
+
+  return <HighchartsReact highcharts={Highcharts} options={options} />;
+});
+
+const EnhancedRecentActivities = ({ title, activities }) => {
+  const { themeColors } = useTheme();
+
+  const getActivityColor = (type, severity) => {
+    if (severity) {
+      switch (severity) {
+        case 'high': return themeColors.danger;
+        case 'medium': return themeColors.warning;
+        case 'low': return themeColors.info;
+        default: return themeColors.primary;
+      }
+    }
+    
+    switch (type) {
+      case 'employee': return themeColors.success;
+      case 'leave': return themeColors.warning;
+      case 'attendance': return themeColors.danger;
+      case 'assets': return themeColors.info;
+      default: return themeColors.primary;
+    }
+  };
+
+  return (
+    <div className="p-6 rounded-lg border" style={{ backgroundColor: themeColors.surface, borderColor: themeColors.border }}>
+      <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.text }}>{title}</h3>
+      <div className="space-y-3">
+        {activities.slice(0, 5).map((activity, index) => (
+          <div key={index} className="flex items-start space-x-3 p-3 rounded" style={{ backgroundColor: themeColors.background }}>
+            <div className="p-2 rounded-full" style={{ backgroundColor: getActivityColor(activity.type, activity.severity) + '20' }}>
+              <div style={{ color: getActivityColor(activity.type, activity.severity) }}>
+                {activity.icon}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: themeColors.text }}>
+                {activity.title}
+              </p>
+              <p className="text-xs mt-1" style={{ color: themeColors.text }}>
+                {activity.subtitle}
+              </p>
+              <p className="text-xs mt-1 opacity-75" style={{ color: themeColors.text }}>
+                {new Date(activity.date).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        ))}
+        {activities.length === 0 && (
           <p className="text-sm text-center py-4" style={{ color: themeColors.text }}>
             No activities found
           </p>

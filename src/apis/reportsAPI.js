@@ -15,9 +15,22 @@ const reportsAPI = {
       headers: getAuthHeader(),
     }),
 
+  // HR Team Employee Reports
+  getHRTeamEmployeeReports: () =>
+    axios.get(`${apiRoutes.reports}/team/employees`, {
+      headers: getAuthHeader(),
+    }),
+
   // Payroll Reports
   getPayrollReports: (params = {}) =>
     axios.get(`${apiRoutes.reports}/payroll`, {
+      params,
+      headers: getAuthHeader(),
+    }),
+
+  // HR Team Payroll Reports
+  getHRTeamPayrollReports: (params = {}) =>
+    axios.get(`${apiRoutes.reports}/team/payroll`, {
       params,
       headers: getAuthHeader(),
     }),
@@ -34,9 +47,21 @@ const reportsAPI = {
       headers: getAuthHeader(),
     }),
 
+  // HR Team Attendance Reports
+  getHRTeamAttendanceReports: () =>
+    axios.get(`${apiRoutes.reports}/team/attendance`, {
+      headers: getAuthHeader(),
+    }),
+
   // Leave Reports
   getLeaveReports: () =>
     axios.get(`${apiRoutes.reports}/leaves`, {
+      headers: getAuthHeader(),
+    }),
+
+  // HR Team Leave Reports
+  getHRTeamLeaveReports: () =>
+    axios.get(`${apiRoutes.reports}/team/leaves`, {
       headers: getAuthHeader(),
     }),
 
@@ -45,8 +70,6 @@ const reportsAPI = {
     axios.get(`${apiRoutes.reports}/departments`, {
       headers: getAuthHeader(),
     }),
-
-
 };
 
 export default reportsAPI;

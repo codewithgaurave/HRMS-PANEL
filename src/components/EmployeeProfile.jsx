@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import employeeAPI from '../apis/employeeAPI';
 import departmentAPI from '../apis/departmentAPI';
 import designationAPI from '../apis/designationAPI';
@@ -24,6 +25,7 @@ const EmployeeProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { themeColors } = useTheme();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('basic-info');
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,31 +55,50 @@ const EmployeeProfile = () => {
   // Fetch all master data
   const fetchMasterData = async () => {
     try {
+      // Fetch basic data that all roles can access
+      const basicPromises = [
+        departmentAPI.getAll({ limit: 100 }).catch(() => ({ data: { departments: [] } })),
+        designationAPI.getAll({ limit: 100 }).catch(() => ({ data: { designations: [] } })),
+        employmentStatusAPI.getAll({ limit: 100 }).catch(() => ({ data: { employmentStatuses: [] } })),
+        officeLocationAPI.getAll().catch(() => ({ data: { officeLocations: [] } })),
+        employeeAPI.getManagers().catch(() => ({ data: { managers: [] } }))
+      ];
+      
       const [
         deptResponse,
         desigResponse,
         statusResponse,
         locationResponse,
-        shiftResponse,
         managersResponse
-      ] = await Promise.all([
-        departmentAPI.getAll({ limit: 100 }),
-        designationAPI.getAll({ limit: 100 }),
-        employmentStatusAPI.getAll({ limit: 100 }),
-        officeLocationAPI.getAll(),
-        workShiftAPI.getAllWithoutFilters(),
-        employeeAPI.getManagers()
-      ]);
-
+      ] = await Promise.all(basicPromises);
+      
       setDepartments(deptResponse.data.departments || []);
       setDesignations(desigResponse.data.designations || []);
       setEmploymentStatuses(statusResponse.data.employmentStatuses || []);
       setOfficeLocations(locationResponse.data.officeLocations || []);
-      setWorkShifts(shiftResponse.data || []);
       setManagers(managersResponse.data.managers || []);
+      
+      // Try to fetch workshift data separately (only for HR Manager)
+      if (user?.role === 'HR_Manager') {
+        try {
+          const shiftResponse = await workShiftAPI.getAllWithoutFilters();
+          setWorkShifts(shiftResponse.data || []);
+        } catch (workshiftError) {
+          console.error('Workshift API error:', workshiftError);
+          setWorkShifts([]);
+        }
+      } else {
+        // For Team Leaders and Employees, use empty array
+        console.log('Skipping workshift API for role:', user?.role);
+        setWorkShifts([]);
+      }
+      
     } catch (err) {
       console.error('Error fetching master data:', err);
-      toast.error('Failed to load some reference data');
+      // Don't show error toast for permission issues
+      if (!err.response || err.response.status !== 403) {
+        toast.error('Failed to load some reference data');
+      }
     }
   };
 
@@ -86,9 +107,16 @@ const EmployeeProfile = () => {
     fetchMasterData();
   }, [id]);
 
-  // Handle section updates
+  // Handle section updates with role-based permissions
   const handleSectionUpdate = async (section, data) => {
     try {
+      // Check if current user can edit this section
+      const canEdit = canEditSection(section, user?.role, employee?._id, user?._id);
+      if (!canEdit) {
+        toast.error('You do not have permission to edit this section');
+        return;
+      }
+
       let response;
       switch (section) {
         case 'basic-info':
@@ -122,6 +150,28 @@ const EmployeeProfile = () => {
       console.error('Update error:', err);
       toast.error(err.response?.data?.message || `Failed to update ${section}`);
     }
+  };
+
+  // Check if user can edit a specific section
+  const canEditSection = (section, userRole, employeeId, currentUserId) => {
+    // HR Manager can edit everything
+    if (userRole === 'HR_Manager') {
+      return true;
+    }
+    
+    // Team Leader can edit their own profile except attendance and employment-details
+    if (userRole === 'Team_Leader' && employeeId === currentUserId) {
+      const restrictedSections = ['attendance', 'employment-details'];
+      return !restrictedSections.includes(section);
+    }
+    
+    // Employee can edit their own profile except attendance and employment-details
+    if (userRole === 'Employee' && employeeId === currentUserId) {
+      const restrictedSections = ['attendance', 'employment-details'];
+      return !restrictedSections.includes(section);
+    }
+    
+    return false;
   };
 
   // Navigation tabs
@@ -270,6 +320,7 @@ const EmployeeProfile = () => {
               <BasicInfoSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('basic-info', data)}
+                canEdit={canEditSection('basic-info', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -277,6 +328,7 @@ const EmployeeProfile = () => {
               <AddressSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('address', data)}
+                canEdit={canEditSection('address', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -290,6 +342,7 @@ const EmployeeProfile = () => {
                 workShifts={workShifts}
                 managers={managers}
                 onUpdate={(data) => handleSectionUpdate('employment-details', data)}
+                canEdit={canEditSection('employment-details', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -297,6 +350,7 @@ const EmployeeProfile = () => {
               <BankDetailsSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('bank-details', data)}
+                canEdit={canEditSection('bank-details', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -304,6 +358,7 @@ const EmployeeProfile = () => {
               <DocumentsSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('documents', data)}
+                canEdit={canEditSection('documents', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -311,6 +366,7 @@ const EmployeeProfile = () => {
               <EmergencyContactSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('emergency-contact', data)}
+                canEdit={canEditSection('emergency-contact', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -318,6 +374,7 @@ const EmployeeProfile = () => {
               <PersonalInfoSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('personal-info', data)}
+                canEdit={canEditSection('personal-info', user?.role, employee?._id, user?._id)}
               />
             )}
 

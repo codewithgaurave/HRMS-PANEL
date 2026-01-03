@@ -82,7 +82,7 @@ const EmployeeAnnouncements = () => {
             </Typography>
           </Box>
           <Typography color="textSecondary">
-            Stay updated with company news and important information
+            View announcements that you have created
           </Typography>
         </CardContent>
       </Card>

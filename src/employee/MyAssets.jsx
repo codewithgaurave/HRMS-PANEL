@@ -35,9 +35,27 @@ const MyAssets = () => {
       console.log('Full API response:', response);
       
       if (response && response.data) {
-        const assetsData = response.data.assets || [];
-        console.log('Extracted assets data:', assetsData);
-        setAssets(assetsData);
+        const allAssets = response.data.assets || [];
+        console.log('All assets from API:', allAssets);
+        
+        // Filter assets to only show those with active assignments for this user
+        const activeAssets = allAssets.filter(asset => {
+          if (!asset.assignedTo || !Array.isArray(asset.assignedTo)) {
+            return false;
+          }
+          
+          // Check if there's an active assignment for this user
+          const hasActiveAssignment = asset.assignedTo.some(assignment => 
+            assignment.isActive && 
+            assignment.employee && 
+            (assignment.employee._id === userId || assignment.employee.id === userId)
+          );
+          
+          return hasActiveAssignment;
+        });
+        
+        console.log('Filtered active assets:', activeAssets);
+        setAssets(activeAssets);
       } else {
         console.log('No response.data found');
         setAssets([]);

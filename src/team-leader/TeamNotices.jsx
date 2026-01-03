@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
-import { Plus, Send, Eye, Calendar } from "lucide-react";
+import { Plus, Send, Eye, Calendar, Bell, User } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import apiRoutes from "../contants/api";
@@ -15,6 +15,7 @@ const getAuthHeader = () => {
 const TeamNotices = () => {
   const { themeColors } = useTheme();
   const [notices, setNotices] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [stats, setStats] = useState({
     totalNoticesSent: 0,
     activeNotices: 0,
@@ -22,6 +23,7 @@ const TeamNotices = () => {
   });
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('notices');
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -31,26 +33,36 @@ const TeamNotices = () => {
   });
 
   useEffect(() => {
-    fetchNotices();
+    fetchData();
   }, []);
 
-  const fetchNotices = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${apiRoutes.notices}/my-notices`, {
+      
+      // Fetch notices created by team leader
+      const noticesResponse = await axios.get(`${apiRoutes.notices}/my-notices`, {
         headers: getAuthHeader(),
       });
-      const noticesData = data.notices || [];
-      setNotices(noticesData);
       
-      // Calculate stats from notices data
+      // Fetch announcements from HR
+      const announcementsResponse = await axios.get(`${apiRoutes.announcements}/employee-filtered`, {
+        headers: getAuthHeader(),
+      });
+      
+      const noticesData = noticesResponse.data.notices || [];
+      const announcementsData = announcementsResponse.data.announcements || [];
+      
+      setNotices(noticesData);
+      setAnnouncements(announcementsData);
+      
+      // Calculate stats
       const totalNoticesSent = noticesData.length;
       const activeNotices = noticesData.filter(notice => {
         if (!notice.expiryDate) return true;
         return new Date(notice.expiryDate) >= new Date();
       }).length;
       
-      // Get team members count from first notice's targetEmployees
       const teamMembers = noticesData.length > 0 ? noticesData[0].targetEmployees?.length || 0 : 2;
       
       setStats({
@@ -59,9 +71,8 @@ const TeamNotices = () => {
         teamMembers
       });
     } catch (err) {
-      console.error('Error fetching notices:', err);
-      setNotices([]);
-      setStats({ totalNoticesSent: 0, activeNotices: 0, teamMembers: 2 });
+      console.error('Error fetching data:', err);
+      toast.error('Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -88,7 +99,7 @@ const TeamNotices = () => {
         priority: "Medium",
         expiryDate: ""
       });
-      fetchNotices(); // Refresh the list
+      fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || "Error sending notice");
     } finally {
@@ -96,13 +107,47 @@ const TeamNotices = () => {
     }
   };
 
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'High': return 'bg-red-100 text-red-800';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800';
+      case 'Low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getCategoryColor = (category) => {
+    const colors = {
+      Urgent: 'bg-red-100 text-red-800',
+      Holiday: 'bg-green-100 text-green-800',
+      Meeting: 'bg-blue-100 text-blue-800',
+      Training: 'bg-purple-100 text-purple-800',
+      Policy: 'bg-orange-100 text-orange-800',
+      General: 'bg-gray-100 text-gray-800'
+    };
+    return colors[category] || 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <div className="space-y-6 p-4" style={{ color: themeColors.text }}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Team Notices</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Bell size={24} style={{ color: themeColors.primary }} />
+            Team Communication
+          </h1>
           <p className="text-sm mt-1" style={{ color: themeColors.textSecondary }}>
-            Send notices and announcements to your team
+            Send notices to your team and view HR announcements
           </p>
         </div>
         <button
@@ -116,10 +161,10 @@ const TeamNotices = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.primary }}>{stats.totalNoticesSent}</div>
-          <div className="text-sm">Total Notices Sent</div>
+          <div className="text-sm">My Notices Sent</div>
         </div>
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.success }}>{stats.activeNotices}</div>
@@ -129,60 +174,131 @@ const TeamNotices = () => {
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.info }}>{stats.teamMembers}</div>
           <div className="text-sm">Team Members</div>
         </div>
+        <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
+          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.warning }}>{announcements.length}</div>
+          <div className="text-sm">HR Announcements</div>
+        </div>
       </div>
 
-      {/* Recent Notices */}
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('notices')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            activeTab === 'notices' ? 'text-white' : ''
+          }`}
+          style={{
+            backgroundColor: activeTab === 'notices' ? themeColors.primary : themeColors.background,
+            color: activeTab === 'notices' ? 'white' : themeColors.text,
+            border: `1px solid ${themeColors.border}`
+          }}
+        >
+          My Notices ({notices.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('announcements')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            activeTab === 'announcements' ? 'text-white' : ''
+          }`}
+          style={{
+            backgroundColor: activeTab === 'announcements' ? themeColors.primary : themeColors.background,
+            color: activeTab === 'announcements' ? 'white' : themeColors.text,
+            border: `1px solid ${themeColors.border}`
+          }}
+        >
+          HR Announcements ({announcements.length})
+        </button>
+      </div>
+
+      {/* Content */}
       <div className="rounded-lg shadow-sm" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
         <div className="p-6 border-b" style={{ borderColor: themeColors.border }}>
-          <h2 className="text-lg font-semibold">Recent Notices</h2>
+          <h2 className="text-lg font-semibold">
+            {activeTab === 'notices' ? 'My Team Notices' : 'HR Announcements'}
+          </h2>
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            {notices.length > 0 ? notices.map((notice) => (
-              <div key={notice._id} className="p-4 rounded-lg border" style={{ borderColor: themeColors.border }}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium">{notice.title}</h3>
-                    <p className="text-sm mt-1" style={{ color: themeColors.textSecondary }}>
-                      {notice.content}
-                    </p>
-                    <div className="flex items-center space-x-4 mt-2 text-xs" style={{ color: themeColors.textSecondary }}>
-                      <span>Type: {notice.type}</span>
-                      <span>Priority: {notice.priority}</span>
-                      <span>Sent: {new Date(notice.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button className="p-1 rounded hover:bg-gray-100" title="View Details">
-                      <Eye size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )) : (
-              // Mock data when no notices
-              [1, 2, 3].map((notice) => (
-                <div key={notice} className="p-4 rounded-lg border" style={{ borderColor: themeColors.border }}>
+            {activeTab === 'notices' ? (
+              notices.length > 0 ? notices.map((notice) => (
+                <div key={notice._id} className="p-4 rounded-lg border" style={{ borderColor: themeColors.border }}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="font-medium">Team Meeting - Project Updates</h3>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          Notice
+                        </span>
+                        {notice.priority && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(notice.priority)}`}>
+                            {notice.priority}
+                          </span>
+                        )}
+                        {notice.type && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(notice.type)}`}>
+                            {notice.type}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-medium">{notice.title}</h3>
                       <p className="text-sm mt-1" style={{ color: themeColors.textSecondary }}>
-                        Please join the team meeting tomorrow at 10 AM to discuss project updates and next steps.
+                        {notice.content}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-xs" style={{ color: themeColors.textSecondary }}>
-                        <span>Type: General</span>
-                        <span>Priority: Medium</span>
-                        <span>Sent: 2 hours ago</span>
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} />
+                          {formatDate(notice.createdAt)}
+                        </span>
+                        <span>To: {notice.targetEmployees?.length || 0} team members</span>
                       </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button className="p-1 rounded hover:bg-gray-100" title="View Details">
-                        <Eye size={16} />
-                      </button>
                     </div>
                   </div>
                 </div>
-              ))
+              )) : (
+                <div className="text-center py-8" style={{ color: themeColors.textSecondary }}>
+                  <Bell size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>No notices sent yet</p>
+                </div>
+              )
+            ) : (
+              announcements.length > 0 ? announcements.map((announcement) => (
+                <div key={announcement._id} className="p-4 rounded-lg border" style={{ borderColor: themeColors.border }}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Announcement
+                        </span>
+                        {announcement.category && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(announcement.category)}`}>
+                            {announcement.category}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-medium">{announcement.title}</h3>
+                      <p className="text-sm mt-1" style={{ color: themeColors.textSecondary }}>
+                        {announcement.message}
+                      </p>
+                      <div className="flex items-center space-x-4 mt-2 text-xs" style={{ color: themeColors.textSecondary }}>
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} />
+                          {formatDate(announcement.createdAt)}
+                        </span>
+                        {announcement.createdBy && (
+                          <span className="flex items-center gap-1">
+                            <User size={12} />
+                            {announcement.createdBy.name?.first} {announcement.createdBy.name?.last} (HR)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8" style={{ color: themeColors.textSecondary }}>
+                  <Bell size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>No announcements from HR</p>
+                </div>
+              )
             )}
           </div>
         </div>

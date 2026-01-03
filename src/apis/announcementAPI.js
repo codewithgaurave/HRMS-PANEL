@@ -71,6 +71,67 @@ const announcementAPI = {
     axios.get(`${apiRoutes.announcements}/stats`, {
       headers: getAuthHeader(),
     }),
+
+  // NEW: Get my announcement statistics (HR-specific)
+  getMyStats: () =>
+    axios.get(`${apiRoutes.announcements}/my-stats`, {
+      headers: getAuthHeader(),
+    }),
+
+  // NEW: Get HR-managed employees
+  getHRManagedEmployees: () =>
+    axios.get(`${apiRoutes.announcements}/hr-managed-employees`, {
+      headers: getAuthHeader(),
+    }),
+
+  // NEW: Create HR-scoped announcement
+  createHRScoped: (data) =>
+    axios.post(`${apiRoutes.announcements}/hr-scoped`, data, {
+      headers: getAuthHeader(),
+    }),
+
+  // NEW: Get HR-scoped announcements
+  getHRScoped: (params = {}) =>
+    axios.get(`${apiRoutes.announcements}/hr-scoped`, {
+      params: {
+        category: params.category || "",
+        isActive: params.isActive || "",
+        search: params.search || "",
+        sortBy: params.sortBy || "createdAt",
+        sortOrder: params.sortOrder || "desc",
+        page: params.page || 1,
+        limit: params.limit || 10,
+      },
+      headers: getAuthHeader(),
+    }),
+
+  // NEW: Get employee filtered announcements (only from their HR)
+  getEmployeeFiltered: (params = {}) =>
+    axios.get(`${apiRoutes.announcements}/employee-filtered`, {
+      params: {
+        category: params.category || "",
+        search: params.search || "",
+        sortBy: params.sortBy || "createdAt",
+        sortOrder: params.sortOrder || "desc",
+        page: params.page || 1,
+        limit: params.limit || 10,
+      },
+      headers: getAuthHeader(),
+    }),
+
+  // NEW: Get announcements created by the logged-in user
+  getMyCreated: (params = {}) =>
+    axios.get(`${apiRoutes.announcements}/created-by-me`, {
+      params: {
+        category: params.category || "",
+        search: params.search || "",
+        sortBy: params.sortBy || "createdAt",
+        sortOrder: params.sortOrder || "desc",
+        page: params.page || 1,
+        limit: params.limit || 10,
+      },
+      headers: getAuthHeader(),
+    }),
 };
 
 export default announcementAPI;

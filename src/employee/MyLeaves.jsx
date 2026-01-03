@@ -60,7 +60,7 @@ const MyLeaves = () => {
   const fetchLeaveTypes = async () => {
     try {
       const token = localStorage.getItem('hrms-token');
-      const response = await fetch('http://localhost:5000/api/leave-policies', {
+      const response = await fetch('http://localhost:5000/api/leaves/available-types', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -68,22 +68,26 @@ const MyLeaves = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setLeaveTypes(data || []);
+        console.log('Leave types response:', data);
+        // Use the correct property from API response
+        const types = data.availableLeaveTypes || [];
+        setLeaveTypes(types);
       } else {
+        console.error('Failed to fetch leave types');
         // Fallback to default leave types
         setLeaveTypes([
-          { name: 'Sick Leave' },
-          { name: 'Casual Leave' },
-          { name: 'Annual Leave' }
+          { leaveType: 'Sick', maxLeavesPerYear: 12 },
+          { leaveType: 'Casual', maxLeavesPerYear: 15 },
+          { leaveType: 'Earned', maxLeavesPerYear: 21 }
         ]);
       }
     } catch (error) {
       console.error('Leave types fetch error:', error);
       // Fallback to default leave types
       setLeaveTypes([
-        { name: 'Sick Leave' },
-        { name: 'Casual Leave' },
-        { name: 'Annual Leave' }
+        { leaveType: 'Sick', maxLeavesPerYear: 12 },
+        { leaveType: 'Casual', maxLeavesPerYear: 15 },
+        { leaveType: 'Earned', maxLeavesPerYear: 21 }
       ]);
     }
   };
@@ -210,12 +214,11 @@ const MyLeaves = () => {
                   required
                 >
                   <option value="">Select Leave Type</option>
-                  {leaveTypes.map((type) => {
-                    const balance = leaveBalance.find(b => b.leaveType === (type.name || type.leaveType));
-                    const typeName = type.name || type.leaveType;
+                  {Array.isArray(leaveTypes) && leaveTypes.map((type, index) => {
+                    const balance = leaveBalance.find(b => b.leaveType === type.leaveType);
                     return (
-                      <option key={typeName} value={typeName}>
-                        {typeName} {balance ? `(${balance.availableDays} available)` : ''}
+                      <option key={index} value={type.leaveType}>
+                        {type.leaveType} {balance ? `(${balance.availableDays} available)` : `(${type.maxLeavesPerYear} max)`}
                       </option>
                     );
                   })}

@@ -20,7 +20,7 @@ const routes = [
   { path: "/my-leaves", component: MyLeaves, name: "My Leaves", icon: "📝" },
   { path: "/team-payroll", component: TeamPayroll, name: "Team Payroll", icon: "💰" },
   { path: "/team-notices", component: TeamNotices, name: "Team Notices", icon: "📢" },
-  { path: "/asset-requests", component: AssetRequests, name: "Asset Requests", icon: "📦" },
+  // { path: "/asset-requests", component: AssetRequests, name: "Asset Requests", icon: "📦" },
   { path: "/my-assets", component: MyAssets, name: "My Assets", icon: "💻" },
   // { path: "/reports", component: Reports, name: "Reports", icon: "📈" },
   // { path: "/settings", component: Settings, name: "Settings", icon: "⚙️" },

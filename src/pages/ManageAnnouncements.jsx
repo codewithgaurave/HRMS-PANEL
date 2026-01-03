@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import announcementAPI from "../apis/announcementAPI";
 import departmentAPI from "../apis/departmentAPI";
 import designationAPI from "../apis/designationAPI";
@@ -21,6 +22,7 @@ import {
 
 const ManageAnnouncements = () => {
   const { themeColors } = useTheme();
+  const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,6 +31,7 @@ const ManageAnnouncements = () => {
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [stats, setStats] = useState({});
+  const [hrManagedData, setHrManagedData] = useState(null);
   
   const [filters, setFilters] = useState({
     category: "",
@@ -66,17 +69,40 @@ const ManageAnnouncements = () => {
     fetchStats();
     fetchDepartments();
     fetchDesignations();
-  }, [filters]);
+    // Temporarily disable HR-scoped data fetching
+    // if (user?.role === 'HR_Manager') {
+    //   fetchHRManagedData();
+    // }
+  }, [filters, user]);
+
+  const fetchHRManagedData = async () => {
+    try {
+      const response = await announcementAPI.getHRManagedEmployees();
+      setHrManagedData(response.data.data);
+    } catch (error) {
+      console.error("Failed to fetch HR managed data:", error);
+    }
+  };
 
   const fetchAnnouncements = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await announcementAPI.getAll(filters);
+      
+      let response;
+      // Use different endpoints based on user role
+      if (user?.role === 'HR_Manager') {
+        // HR sees only announcements they created
+        response = await announcementAPI.getMyCreated(filters);
+      } else {
+        // Team Leaders and Employees see announcements from their HR
+        response = await announcementAPI.getEmployeeFiltered(filters);
+      }
+      
       setAnnouncements(response.data.announcements);
       setPagination(response.data.pagination);
     } catch (err) {
-        console.log(err)
+      console.log(err);
       setError(err.response?.data?.message || "Failed to fetch announcements");
     } finally {
       setLoading(false);
@@ -85,7 +111,16 @@ const ManageAnnouncements = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await announcementAPI.getStats();
+      let response;
+      // Use different stats endpoints based on user role
+      if (user?.role === 'HR_Manager') {
+        // HR sees stats for their created announcements
+        response = await announcementAPI.getMyStats();
+      } else {
+        // For non-HR users, we can create a simple stats calculation
+        // or use a different endpoint if needed
+        response = await announcementAPI.getMyStats();
+      }
       setStats(response.data.stats);
     } catch (error) {
       console.error("Failed to fetch stats:", error);
@@ -149,6 +184,7 @@ const ManageAnnouncements = () => {
       if (editingAnnouncement) {
         await announcementAPI.update(editingAnnouncement._id, formData);
       } else {
+        // Use regular create for all users temporarily
         await announcementAPI.create(formData);
       }
       handleCloseDialog();
@@ -294,9 +330,14 @@ const ManageAnnouncements = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Announcement Management</h1>
+          <h1 className="text-2xl font-bold">
+            {user?.role === 'HR_Manager' ? 'Announcement Management' : 'Company Announcements'}
+          </h1>
           <p className="text-sm mt-1" style={{ color: themeColors.textSecondary }}>
-            Create and manage company announcements
+            {user?.role === 'HR_Manager' 
+              ? 'Create and manage company announcements' 
+              : 'View announcements from your HR department'
+            }
           </p>
         </div>
         <div className="flex gap-3 mt-4 md:mt-0">
@@ -324,14 +365,16 @@ const ManageAnnouncements = () => {
             <Filter size={16} />
             Clear Filters
           </button>
-          <button
-            onClick={() => handleOpenDialog()}
-            className="px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90 flex items-center gap-2 text-white"
-            style={{ backgroundColor: themeColors.primary }}
-          >
-            <Plus size={16} />
-            New Announcement
-          </button>
+          {user?.role === 'HR_Manager' && (
+            <button
+              onClick={() => handleOpenDialog()}
+              className="px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90 flex items-center gap-2 text-white"
+              style={{ backgroundColor: themeColors.primary }}
+            >
+              <Plus size={16} />
+              New Announcement
+            </button>
+          )}
         </div>
       </div>
 
@@ -358,19 +401,19 @@ const ManageAnnouncements = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.primary }}>{stats.total || 0}</div>
-          <div className="text-sm">Total Announcements</div>
+          <div className="text-sm">{user?.role === 'HR_Manager' ? 'My Total Announcements' : 'Total Announcements'}</div>
         </div>
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.success }}>{stats.active || 0}</div>
-          <div className="text-sm">Active</div>
+          <div className="text-sm">{user?.role === 'HR_Manager' ? 'My Active' : 'Active'}</div>
         </div>
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.textSecondary }}>{stats.inactive || 0}</div>
-          <div className="text-sm">Inactive</div>
+          <div className="text-sm">{user?.role === 'HR_Manager' ? 'My Inactive' : 'Inactive'}</div>
         </div>
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
           <div className="text-3xl font-bold mb-2" style={{ color: themeColors.info }}>{stats.categories?.length || 0}</div>
-          <div className="text-sm">Categories</div>
+          <div className="text-sm">{user?.role === 'HR_Manager' ? 'My Categories' : 'Categories'}</div>
         </div>
       </div>
 
@@ -440,7 +483,9 @@ const ManageAnnouncements = () => {
       {/* Announcements Table */}
       <div className="p-6 rounded-lg shadow-sm overflow-x-auto" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">All Announcements</h2>
+          <h2 className="text-lg font-semibold">
+            {user?.role === 'HR_Manager' ? 'My Announcements' : 'Company Announcements'}
+          </h2>
           <div className="flex items-center gap-2">
             <button
               onClick={fetchAnnouncements}
@@ -463,7 +508,7 @@ const ManageAnnouncements = () => {
           <div className="text-center py-12" style={{ color: themeColors.textSecondary }}>
             <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
             <p className="text-lg mb-2">No announcements found</p>
-            <p className="text-sm">No announcements match your current filters.</p>
+            <p className="text-sm">You haven't created any announcements yet.</p>
           </div>
         ) : (
           <>
@@ -530,18 +575,28 @@ const ManageAnnouncements = () => {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleToggleStatus(announcement._id, announcement.isActive)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            announcement.isActive ? 'bg-green-500' : 'bg-gray-300'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              announcement.isActive ? 'translate-x-6' : 'translate-x-1'
+                        {user?.role === 'HR_Manager' ? (
+                          <button
+                            onClick={() => handleToggleStatus(announcement._id, announcement.isActive)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              announcement.isActive ? 'bg-green-500' : 'bg-gray-300'
                             }`}
-                          />
-                        </button>
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                announcement.isActive ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        ) : (
+                          <div className={`h-6 w-11 rounded-full ${
+                            announcement.isActive ? 'bg-green-500' : 'bg-gray-300'
+                          }`}>
+                            <div className={`h-4 w-4 mt-1 transform rounded-full bg-white ${
+                              announcement.isActive ? 'translate-x-6' : 'translate-x-1'
+                            }`} />
+                          </div>
+                        )}
                         <span className={getStatusBadge(announcement.isActive)}>
                           {announcement.isActive ? 'Active' : 'Inactive'}
                         </span>
@@ -560,24 +615,30 @@ const ManageAnnouncements = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleOpenDialog(announcement)}
-                          className="p-2 rounded text-white transition-colors hover:opacity-90"
-                          style={{ backgroundColor: themeColors.warning }}
-                          title="Edit Announcement"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(announcement._id)}
-                          className="p-2 rounded text-white transition-colors hover:opacity-90"
-                          style={{ backgroundColor: themeColors.danger }}
-                          title="Delete Announcement"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {user?.role === 'HR_Manager' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleOpenDialog(announcement)}
+                            className="p-2 rounded text-white transition-colors hover:opacity-90"
+                            style={{ backgroundColor: themeColors.warning }}
+                            title="Edit Announcement"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(announcement._id)}
+                            className="p-2 rounded text-white transition-colors hover:opacity-90"
+                            style={{ backgroundColor: themeColors.danger }}
+                            title="Delete Announcement"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-sm" style={{ color: themeColors.textSecondary }}>
+                          View Only
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

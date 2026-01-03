@@ -166,15 +166,6 @@ const MyAssets = () => {
                 </span>
               </div>
             </div>
-
-            <div className="mt-4 pt-4 border-t" style={{ borderColor: themeColors.border }}>
-              <button
-                className="w-full px-3 py-2 rounded-lg text-sm font-medium"
-                style={{ backgroundColor: themeColors.background, color: themeColors.text, border: `1px solid ${themeColors.border}` }}
-              >
-                View Details
-              </button>
-            </div>
           </div>
         ))}
       </div>

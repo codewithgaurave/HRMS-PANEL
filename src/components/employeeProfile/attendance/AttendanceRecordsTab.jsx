@@ -217,7 +217,14 @@ const AttendanceRecordsTab = ({ data, filters, onFilterChange, onRefresh }) => {
                         </thead>
                         <tbody className="divide-y" style={{ borderColor: themeColors.border }}>
                             {attendances?.map((attendance) => (
-                                <tr key={attendance._id} style={{ color: themeColors.text }}>
+                                <tr 
+                                    key={attendance._id} 
+                                    className="border-b"
+                                    style={{ 
+                                        color: themeColors.text,
+                                        borderColor: themeColors.border
+                                    }}
+                                >
                                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                                         {new Date(attendance.date).toLocaleDateString()}
                                     </td>

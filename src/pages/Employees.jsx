@@ -1,11 +1,28 @@
 // src/components/Employees.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "../context/ThemeContext";
 import employeeAPI from "../apis/employeeAPI";
 import CreateEmployeeModal from "./modals/CreateEmployeeModal";
 import UpdateEmployeeModal from "./modals/UpdateEmployeeModal";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+// Debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 const Employees = () => {
   const { themeColors } = useTheme();
@@ -29,13 +46,17 @@ const Employees = () => {
     limit: 10
   });
 
+  // Debounced search to prevent excessive API calls
+  const debouncedSearch = useDebounce(filters.search, 500);
+  const [isSearching, setIsSearching] = useState(false);
+
   // Fetch employees with filters
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsSearching(true);
       
       const queryParams = {};
-      if (filters.search) queryParams.search = filters.search;
+      if (debouncedSearch) queryParams.search = debouncedSearch;
       if (filters.role) queryParams.role = filters.role;
       if (filters.designation) queryParams.designation = filters.designation;
       if (filters.isActive !== '') queryParams.isActive = filters.isActive;
@@ -48,9 +69,9 @@ const Employees = () => {
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching employees");
     } finally {
-      setLoading(false);
+      setIsSearching(false);
     }
-  };
+  }, [debouncedSearch, filters.role, filters.designation, filters.isActive, filters.page, filters.limit]);
 
   // Handle filter changes
   const handleFilterChange = (key, value) => {
@@ -156,9 +177,28 @@ const Employees = () => {
     return 'N/A';
   };
 
+  // Initial load
   useEffect(() => {
-    fetchEmployees();
-  }, [filters]);
+    const initialLoad = async () => {
+      try {
+        setLoading(true);
+        const { data } = await employeeAPI.getEmployeesAddedByMe({ page: 1, limit: 10 });
+        setEmployees(data.employees || []);
+      } catch (err) {
+        setError(err.response?.data?.message || err.message || "Error fetching employees");
+      } finally {
+        setLoading(false);
+      }
+    };
+    initialLoad();
+  }, []);
+
+  // Filter changes (excluding search)
+  useEffect(() => {
+    if (!loading) {
+      fetchEmployees();
+    }
+  }, [fetchEmployees, loading]);
 
   if (loading) {
     return (
@@ -242,14 +282,21 @@ const Employees = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2">Search</label>
-            <input
-              type="text"
-              placeholder="Search by name, email, designation..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-full p-2 rounded-md border text-sm"
-              style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name, email, designation..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full p-2 rounded-md border text-sm pr-8"
+                style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+              />
+              {isSearching && (
+                <div className="absolute right-2 top-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Role</label>

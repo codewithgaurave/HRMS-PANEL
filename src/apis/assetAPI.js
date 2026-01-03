@@ -22,6 +22,19 @@ const assetAPI = {
       headers: getAuthHeader(),
     }),
 
+  // Get HR Team Assets (filtered for HR managers)
+  getHRTeamAssets: (params = {}) =>
+    axios.get(`${apiRoutes.assets}/team/hr`, {
+      params,
+      headers: getAuthHeader(),
+    }),
+
+  // Get HR Team Employees for Asset Assignment
+  getHRTeamEmployees: () =>
+    axios.get(`${apiRoutes.assets}/team/employees`, {
+      headers: getAuthHeader(),
+    }),
+
   // Get single Asset by ID
   getById: (id) =>
     axios.get(`${apiRoutes.assets}/${id}`, {
@@ -43,6 +56,12 @@ const assetAPI = {
   // Assign Asset
   assign: (id, employeeId) =>
     axios.post(`${apiRoutes.assets}/${id}/assign`, { employeeId }, {
+      headers: getAuthHeader(),
+    }),
+
+  // Assign Asset to HR Team Member
+  assignToTeam: (id, employeeId) =>
+    axios.post(`${apiRoutes.assets}/${id}/assign/team`, { employeeId }, {
       headers: getAuthHeader(),
     }),
 

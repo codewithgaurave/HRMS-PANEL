@@ -166,14 +166,14 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
         address: formData.address.street ? formData.address : undefined
       };
 
-      const { data } = await employeeAPI.update(employee._id, updateData);
-      toast.success(data.success)
-      onEmployeeUpdated(data.employee);
+      const response = await employeeAPI.update(employee._id, updateData);
+      toast.success(response.data.message || "Employee updated successfully!");
+      onEmployeeUpdated(response.data.employee);
       onClose();
 
     } catch (err) {
-      console.log("err", err)
-      toast.error(err.response?.data?.message)
+      console.log("err", err);
+      toast.error(err.response?.data?.message || "Error updating employee");
       setError(err.response?.data?.message || err.message || "Error updating employee");
     } finally {
       setLoading(false);
@@ -182,8 +182,17 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
 
   if (!isOpen || !employee) return null;
 
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      onClick={handleBackdropClick}
+    >
       <div 
         className="rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
         style={{

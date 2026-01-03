@@ -53,10 +53,13 @@ const Payroll = () => {
   const fetchPayrolls = async () => {
     try {
       setLoading(true);
-      const { data } = await payrollAPI.getAll(filters);
+      // Use specific HR team endpoint for HR managers
+      const { data } = await payrollAPI.getHRTeamPayrolls(filters);
       setPayrolls(data.payrolls || []);
+      console.log('Fetched payrolls:', data.payrolls?.length, 'Team members:', data.teamMembers);
     } catch (err) {
       setError(err.response?.data?.message || "Error fetching payrolls");
+      console.error('Fetch payrolls error:', err);
     } finally {
       setLoading(false);
     }
@@ -64,7 +67,8 @@ const Payroll = () => {
 
   const fetchEmployees = async () => {
     try {
-      const { data } = await employeeAPI.getAll({ limit: 100 });
+      // Use getEmployeesAddedByMe to get only HR's team members
+      const { data } = await employeeAPI.getEmployeesAddedByMe({ limit: 100 });
       setEmployees(data.employees || []);
     } catch (err) {
       console.error("Error fetching employees:", err);

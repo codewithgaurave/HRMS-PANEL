@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
-const BasicInfoSection = ({ employee, onUpdate }) => {
+const BasicInfoSection = ({ employee, onUpdate, canEdit = true }) => {
   const { themeColors } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -69,13 +69,15 @@ const BasicInfoSection = ({ employee, onUpdate }) => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Basic Information</h2>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
-          style={{ backgroundColor: themeColors.primary }}
-        >
-          {isEditing ? 'Cancel' : 'Edit'}
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
+            style={{ backgroundColor: themeColors.primary }}
+          >
+            {isEditing ? 'Cancel' : 'Edit'}
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -90,7 +92,7 @@ const BasicInfoSection = ({ employee, onUpdate }) => {
               name="name.first"
               value={formData.name.first}
               onChange={handleChange}
-              disabled={!isEditing}
+              disabled={!isEditing || !canEdit}
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 disabled:bg-gray-100"
               style={{
                 backgroundColor: themeColors.background,
@@ -274,7 +276,7 @@ const BasicInfoSection = ({ employee, onUpdate }) => {
           </div>
         </div>
 
-        {isEditing && (
+        {isEditing && canEdit && (
           <div className="flex justify-end space-x-4 pt-6 border-t" style={{ borderColor: themeColors.border }}>
             <button
               type="button"

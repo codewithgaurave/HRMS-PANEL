@@ -1,10 +1,42 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import reportsAPI from "../apis/reportsAPI";
+import apiRoutes from "../contants/api";
 import { BarChart3, Users, DollarSign, Package, TrendingUp, Download, Calendar } from "lucide-react";
+
+// Export utility functions
+const exportToCSV = (data, filename) => {
+  const csvContent = "data:text/csv;charset=utf-8," + data;
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const convertToCSV = (objArray, headers) => {
+  const array = typeof objArray !== 'object' ? JSON.parse(objArray) : objArray;
+  let str = headers.join(',') + '\r\n';
+  
+  for (let i = 0; i < array.length; i++) {
+    let line = '';
+    for (let index in headers) {
+      if (line !== '') line += ',';
+      const header = headers[index];
+      const value = array[i][header] || '';
+      line += typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+    }
+    str += line + '\r\n';
+  }
+  return str;
+};
 
 const Reports = () => {
   const { themeColors } = useTheme();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [loading, setLoading] = useState(true);
   const [employeeReports, setEmployeeReports] = useState(null);
@@ -16,6 +48,104 @@ const Reports = () => {
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+  const handleExport = () => {
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    switch (activeTab) {
+      case 'employees':
+        if (employeeReports) {
+          const employeeData = [
+            { Category: 'Total Employees', Count: employeeReports.summary.totalEmployees },
+            { Category: 'Active Employees', Count: employeeReports.summary.activeEmployees },
+            { Category: 'Inactive Employees', Count: employeeReports.summary.inactiveEmployees },
+            ...employeeReports.departmentStats.map(dept => ({ Category: `Department - ${dept._id}`, Count: dept.count })),
+            ...employeeReports.roleStats.map(role => ({ Category: `Role - ${role._id}`, Count: role.count }))
+          ];
+          const csv = convertToCSV(employeeData, ['Category', 'Count']);
+          exportToCSV(csv, `employee-report-${currentDate}`);
+        }
+        break;
+        
+      case 'payroll':
+        if (payrollReports && payrollReports.monthlyStats) {
+          const payrollData = payrollReports.monthlyStats.map(month => ({
+            Month: new Date(0, month._id - 1).toLocaleString('default', { month: 'long' }),
+            'Total Payrolls': month.totalPayrolls,
+            'Total Gross Salary': month.totalGrossSalary,
+            'Total Net Salary': month.totalNetSalary,
+            'Average Salary': Math.round(month.avgSalary)
+          }));
+          const csv = convertToCSV(payrollData, ['Month', 'Total Payrolls', 'Total Gross Salary', 'Total Net Salary', 'Average Salary']);
+          exportToCSV(csv, `payroll-report-${selectedYear}-${currentDate}`);
+        }
+        break;
+        
+      case 'assets':
+        if (assetReports) {
+          const assetData = [
+            { Category: 'Total Assets', Count: assetReports.totalAssets },
+            ...assetReports.statusStats.map(status => ({ Category: `Status - ${status._id}`, Count: status.count })),
+            ...assetReports.categoryStats.map(cat => ({ Category: `Category - ${cat._id}`, Count: cat.count, Assigned: cat.assigned }))
+          ];
+          const csv = convertToCSV(assetData, ['Category', 'Count', 'Assigned']);
+          exportToCSV(csv, `asset-report-${currentDate}`);
+        }
+        break;
+        
+      case 'attendance':
+        if (attendanceReports) {
+          const attendanceData = [
+            { Metric: 'Average Attendance', Value: `${attendanceReports.averageAttendance}%` },
+            { Metric: 'Present Today', Value: attendanceReports.todayAttendance },
+            { Metric: 'Late Today', Value: attendanceReports.lateToday },
+            { Metric: 'Total Employees', Value: attendanceReports.totalEmployees },
+            ...attendanceReports.monthlyStats.map(stat => {
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              const attendance = Math.round((stat.present / (stat.present + stat.absent + stat.late)) * 100);
+              return {
+                Metric: `${monthNames[stat._id - 1]} Attendance`,
+                Value: `${attendance}%`,
+                Present: stat.present,
+                Absent: stat.absent,
+                Late: stat.late
+              };
+            })
+          ];
+          const csv = convertToCSV(attendanceData, ['Metric', 'Value', 'Present', 'Absent', 'Late']);
+          exportToCSV(csv, `attendance-report-${currentDate}`);
+        }
+        break;
+        
+      case 'leaves':
+        if (leaveReports) {
+          const leaveData = [
+            { Category: 'Total Leaves', Count: leaveReports.totalLeaves },
+            ...(leaveReports.statusStats || []).map(status => ({ Category: `Status - ${status._id}`, Count: status.count })),
+            ...(leaveReports.typeStats || []).map(type => ({ Category: `Type - ${type._id}`, Count: type.count }))
+          ];
+          const csv = convertToCSV(leaveData, ['Category', 'Count']);
+          exportToCSV(csv, `leave-report-${currentDate}`);
+        }
+        break;
+        
+      case 'departments':
+        if (departmentReports) {
+          const deptData = departmentReports.departmentStats.map(dept => ({
+            Department: dept._id,
+            Employees: dept.employees,
+            'Average Salary': Math.round(dept.avgSalary || 0),
+            'Total Budget': Math.round(departmentReports.payrollByDept.find(p => p._id === dept._id)?.totalBudget || 0)
+          }));
+          const csv = convertToCSV(deptData, ['Department', 'Employees', 'Average Salary', 'Total Budget']);
+          exportToCSV(csv, `department-report-${currentDate}`);
+        }
+        break;
+        
+      default:
+        alert('No data available to export');
+    }
+  };
+
   useEffect(() => {
     fetchReports();
   }, [activeTab, selectedYear]);
@@ -24,28 +154,91 @@ const Reports = () => {
     try {
       setLoading(true);
       
+      // Use HR team endpoints for HR managers
+      const isHRManager = user?.role === 'HR_Manager';
+      
       if (activeTab === 'employees') {
-        const { data } = await reportsAPI.getEmployeeReports();
+        const { data } = isHRManager 
+          ? await reportsAPI.getHRTeamEmployeeReports()
+          : await reportsAPI.getEmployeeReports();
         setEmployeeReports(data.data);
       } else if (activeTab === 'payroll') {
-        const { data } = await reportsAPI.getPayrollReports({ year: selectedYear });
+        const { data } = isHRManager
+          ? await reportsAPI.getHRTeamPayrollReports({ year: selectedYear })
+          : await reportsAPI.getPayrollReports({ year: selectedYear });
         setPayrollReports(data.data);
       } else if (activeTab === 'assets') {
         const { data } = await reportsAPI.getAssetReports();
         setAssetReports(data.data);
       } else if (activeTab === 'attendance') {
-        const { data } = await reportsAPI.getAttendanceReports();
-        setAttendanceReports(data.data);
+        console.log('=== ATTENDANCE REPORTS DEBUG ===');
+        console.log('Current user:', user);
+        console.log('User role:', user?.role);
+        console.log('Is HR Manager:', isHRManager);
+        console.log('Active tab:', activeTab);
+        
+        const baseURL = import.meta.env.VITE_BASE_API;
+        const apiPrefix = import.meta.env.VITE_API_PREFIX || 'api';
+        const endpoint = isHRManager ? 'team/attendance' : 'attendance';
+        const fullURL = `${baseURL}/${apiPrefix}/reports/${endpoint}`;
+        
+        console.log('Base URL:', baseURL);
+        console.log('API Prefix:', apiPrefix);
+        console.log('Endpoint:', endpoint);
+        console.log('Full URL:', fullURL);
+        console.log('Auth token exists:', !!localStorage.getItem('hrms-token'));
+        
+        try {
+          console.log('Making API call...');
+          const response = isHRManager
+            ? await reportsAPI.getHRTeamAttendanceReports()
+            : await reportsAPI.getAttendanceReports();
+            
+          console.log('Raw response:', response);
+          console.log('Response status:', response.status);
+          console.log('Response headers:', response.headers);
+          console.log('Response data:', response.data);
+          
+          if (response.data) {
+            console.log('Data structure:', {
+              success: response.data.success,
+              message: response.data.message,
+              data: response.data.data,
+              dataKeys: response.data.data ? Object.keys(response.data.data) : 'No data object'
+            });
+          }
+          
+          setAttendanceReports(response.data.data);
+          console.log('Attendance reports set successfully');
+        } catch (apiError) {
+          console.error('API call failed:', apiError);
+          console.error('Error details:', {
+            message: apiError.message,
+            status: apiError.response?.status,
+            statusText: apiError.response?.statusText,
+            data: apiError.response?.data,
+            config: apiError.config
+          });
+          throw apiError;
+        }
+        console.log('=== END ATTENDANCE DEBUG ===');
       } else if (activeTab === 'leaves') {
-        const { data } = await reportsAPI.getLeaveReports();
+        const { data } = isHRManager
+          ? await reportsAPI.getHRTeamLeaveReports()
+          : await reportsAPI.getLeaveReports();
         setLeaveReports(data.data);
       } else if (activeTab === 'departments') {
         const { data } = await reportsAPI.getDepartmentReports();
         setDepartmentReports(data.data);
-
       }
     } catch (error) {
       console.error('Error fetching reports:', error);
+      console.error('Error response:', error.response);
+      console.error('Error message:', error.message);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
     } finally {
       setLoading(false);
     }
@@ -116,6 +309,7 @@ const Reports = () => {
             </select>
           )}
           <button
+            onClick={handleExport}
             className="px-4 py-2 rounded-lg font-medium text-white flex items-center gap-2"
             style={{ backgroundColor: themeColors.primary }}
           >
@@ -244,7 +438,7 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {payrollReports.monthlyStats.map((month) => (
+                  {payrollReports.monthlyStats && payrollReports.monthlyStats.map((month) => (
                     <tr key={month._id} className="border-b" style={{ borderColor: themeColors.border }}>
                       <td className="p-3 text-sm">
                         {new Date(0, month._id - 1).toLocaleString('default', { month: 'long' })}
@@ -264,7 +458,7 @@ const Reports = () => {
             {/* Status Stats */}
             <ChartCard title="Payroll Status">
               <div className="space-y-3">
-                {payrollReports.statusStats.map((status, index) => (
+                {payrollReports.statusStats && payrollReports.statusStats.map((status, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <span className="text-sm">{status._id}</span>
                     <div className="flex items-center gap-2">
@@ -281,7 +475,7 @@ const Reports = () => {
             {/* Department Payroll */}
             <ChartCard title="Department-wise Payroll">
               <div className="space-y-3">
-                {payrollReports.departmentPayroll.map((dept, index) => (
+                {payrollReports.departmentPayroll && payrollReports.departmentPayroll.map((dept, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <span className="text-sm">{dept._id}</span>
                     <div className="text-right">
@@ -367,29 +561,55 @@ const Reports = () => {
       {activeTab === 'attendance' && attendanceReports && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <StatCard title="Average Attendance" value={`${attendanceReports.averageAttendance}%`} icon={Calendar} color={themeColors.success} />
-            <StatCard title="Present Today" value={attendanceReports.todayAttendance} icon={Users} color={themeColors.primary} />
-            <StatCard title="Late Today" value={attendanceReports.lateToday} icon={TrendingUp} color={themeColors.warning} />
-            <StatCard title="Total Employees" value={attendanceReports.totalEmployees} icon={Users} color={themeColors.primary} />
+            <StatCard title="Average Attendance" value={`${parseFloat(attendanceReports.averageAttendance || 0).toFixed(1)}%`} icon={Calendar} color={themeColors.success} />
+            <StatCard title="Present Today" value={attendanceReports.todayAttendance || 0} icon={Users} color={themeColors.primary} />
+            <StatCard title="Late Today" value={attendanceReports.lateToday || 0} icon={TrendingUp} color={themeColors.warning} />
+            <StatCard title="Total Employees" value={attendanceReports.totalEmployees || attendanceReports.teamSize || 0} icon={Users} color={themeColors.primary} />
           </div>
           <ChartCard title="Monthly Attendance Trends">
             <div className="space-y-3">
-              {attendanceReports.monthlyStats.map((stat, index) => {
+              {attendanceReports.monthlyStats && attendanceReports.monthlyStats.length > 0 ? attendanceReports.monthlyStats.map((stat, index) => {
                 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const attendance = Math.round((stat.present / (stat.present + stat.absent + stat.late)) * 100);
+                const totalDays = (stat.present || 0) + (stat.absent || 0) + (stat.late || 0);
+                const attendance = totalDays > 0 ? Math.round(((stat.present || 0) / totalDays) * 100) : 0;
                 return (
                   <div key={index} className="flex justify-between items-center">
                     <span className="text-sm">{monthNames[stat._id - 1]}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{attendance}%</span>
+                      <span className="text-xs" style={{ color: themeColors.textSecondary }}>({stat.present || 0}P/{stat.late || 0}L/{stat.absent || 0}A)</span>
                       <div className="w-20 bg-gray-200 rounded-full h-2">
                         <div className="h-2 rounded-full" style={{ backgroundColor: themeColors.success, width: `${attendance}%` }}></div>
                       </div>
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="text-center py-4" style={{ color: themeColors.textSecondary }}>
+                  <p>No monthly attendance data available</p>
+                  <p className="text-xs mt-1">Employees need to mark attendance to see data</p>
+                </div>
+              )}
             </div>
+          </ChartCard>
+          
+          {/* Additional Info Card */}
+          <ChartCard title="Attendance Summary">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 rounded" style={{ backgroundColor: themeColors.background }}>
+                <div className="text-2xl font-bold" style={{ color: themeColors.primary }}>{attendanceReports.teamSize || attendanceReports.totalEmployees || 0}</div>
+                <div className="text-sm" style={{ color: themeColors.textSecondary }}>Team Size</div>
+              </div>
+              <div className="text-center p-4 rounded" style={{ backgroundColor: themeColors.background }}>
+                <div className="text-2xl font-bold" style={{ color: themeColors.success }}>{parseFloat(attendanceReports.averageAttendance || 0).toFixed(1)}%</div>
+                <div className="text-sm" style={{ color: themeColors.textSecondary }}>Overall Average</div>
+              </div>
+            </div>
+            {parseFloat(attendanceReports.averageAttendance || 0) === 0 && (
+              <div className="mt-4 p-3 rounded" style={{ backgroundColor: themeColors.warning + '20', color: themeColors.warning }}>
+                <p className="text-sm">📝 No attendance data found. Employees need to start marking attendance to see reports.</p>
+              </div>
+            )}
           </ChartCard>
         </div>
       )}
@@ -399,7 +619,7 @@ const Reports = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <StatCard title="Total Leaves" value={leaveReports.totalLeaves} icon={Calendar} color={themeColors.primary} />
-            {leaveReports.statusStats.map((status, index) => (
+            {leaveReports.statusStats && leaveReports.statusStats.map((status, index) => (
               <StatCard 
                 key={index}
                 title={status._id} 
@@ -412,7 +632,7 @@ const Reports = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ChartCard title="Leave Types">
               <div className="space-y-3">
-                {leaveReports.typeStats.map((leave, index) => (
+                {leaveReports.typeStats && leaveReports.typeStats.map((leave, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <span className="text-sm">{leave._id}</span>
                     <span className="text-sm font-medium">{leave.count}</span>
@@ -422,7 +642,7 @@ const Reports = () => {
             </ChartCard>
             <ChartCard title="Monthly Leave Requests">
               <div className="space-y-3">
-                {leaveReports.monthlyStats.map((stat, index) => {
+                {leaveReports.monthlyStats && leaveReports.monthlyStats.map((stat, index) => {
                   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                   return (
                     <div key={index} className="flex justify-between items-center">

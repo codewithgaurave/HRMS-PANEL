@@ -310,73 +310,64 @@ const Header = memo(({
           {/* Settings Button */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="p-1.5 rounded-md border hover:scale-110 hover:rotate-45 transition-all duration-300 group"
+            className="p-2 rounded-lg border hover:scale-105 transition-all duration-200 group"
             style={{
               backgroundColor: themeColors.background,
-              color: themeColors.text,
+              color: themeColors.textSecondary,
               borderColor: themeColors.border,
             }}
             aria-label="Open settings"
             title="Settings"
           >
-            <span className="text-base group-hover:animate-spin">⚙️</span>
+            <span className="text-sm group-hover:rotate-90 transition-transform duration-300">⚙️</span>
           </button>
 
           {/* Quick Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-1.5 rounded-md border hover:scale-110 transition-all duration-300 group"
+            className="p-2 rounded-lg border hover:scale-105 transition-all duration-200 group"
             style={{
               backgroundColor: themeColors.background,
-              color: themeColors.text,
+              color: themeColors.textSecondary,
               borderColor: themeColors.border,
             }}
             aria-label="Quick theme toggle"
             title={`Switch to ${themeColors.mode === 'dark' ? 'Light' : 'Dark'} Mode`}
           >
-            <span className="text-base group-hover:rotate-180 transition-transform duration-300">
+            <span className="text-sm group-hover:rotate-180 transition-transform duration-300">
               {themeColors.mode === "dark" ? "☀️" : "🌙"}
             </span>
           </button>
 
-          {/* Notifications */}
-          <div className="relative">
-            <button
-              className="p-1.5 rounded-md hover:scale-110 transition-all duration-200 border group"
-              style={{
-                color: themeColors.text,
-                backgroundColor: themeColors.background,
-                borderColor: themeColors.border
-              }}
-              aria-label="View notifications"
-              title="Notifications"
-            >
-              <span className="text-base group-hover:animate-bounce">🔔</span>
-            </button>
-            <span
-              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse border"
-              style={{
-                backgroundColor: themeColors.danger,
-                borderColor: themeColors.surface
-              }}
-            ></span>
-          </div>
-
-          {/* User Avatar */}
-          <div>
-            <button
-              className="w-7 h-7 rounded-full border hover:scale-110 transition-all duration-200 flex items-center justify-center font-semibold"
+          {/* User Profile */}
+          <button
+            onClick={handleMyProfileClick}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border hover:scale-105 transition-all duration-200 group"
+            style={{
+              backgroundColor: themeColors.surface,
+              borderColor: themeColors.border,
+              color: themeColors.text
+            }}
+            title="View Profile"
+          >
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm group-hover:scale-110 transition-transform duration-200"
               style={{
                 backgroundColor: themeColors.primary,
-                color: themeColors.onPrimary,
-                borderColor: themeColors.border
+                boxShadow: `0 2px 8px ${themeColors.primary}40`
               }}
-              title="User Profile"
-              onClick={handleMyProfileClick}
             >
-              <span className="text-xs"><User2 size={14} /></span>
-            </button>
-          </div>
+              {user?.name?.first?.charAt(0)?.toUpperCase() || <User2 size={16} />}
+            </div>
+            <div className="hidden sm:block text-left">
+              <div className="text-sm font-medium" style={{ color: themeColors.text }}>
+                {user?.name?.first} {user?.name?.last}
+              </div>
+              <div className="text-xs" style={{ color: themeColors.textSecondary }}>
+                {user?.role?.replace('_', ' ')}
+              </div>
+            </div>
+          </button>
         </div>
       </header>
 

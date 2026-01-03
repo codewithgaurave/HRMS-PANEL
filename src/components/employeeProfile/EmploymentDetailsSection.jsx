@@ -10,7 +10,8 @@ const EmploymentDetailsSection = ({
   officeLocations,
   workShifts,
   managers,
-  onUpdate
+  onUpdate,
+  canEdit = true
 }) => {
   const { themeColors } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
@@ -79,16 +80,18 @@ const EmploymentDetailsSection = ({
         >
           Employment Details
         </h2>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="px-4 py-2 rounded-lg font-medium transition-colors"
-          style={{ 
-            backgroundColor: isEditing ? themeColors.danger : themeColors.primary,
-            color: themeColors.surface
-          }}
-        >
-          {isEditing ? 'Cancel' : 'Edit'}
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="px-4 py-2 rounded-lg font-medium transition-colors"
+            style={{ 
+              backgroundColor: isEditing ? themeColors.danger : themeColors.primary,
+              color: themeColors.surface
+            }}
+          >
+            {isEditing ? 'Cancel' : 'Edit'}
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -353,7 +356,7 @@ const EmploymentDetailsSection = ({
           )}
         </div>
 
-        {isEditing && (
+        {isEditing && canEdit && (
           <div 
             className="flex justify-end space-x-4 pt-6 border-t"
             style={{ borderColor: themeColors.border }}

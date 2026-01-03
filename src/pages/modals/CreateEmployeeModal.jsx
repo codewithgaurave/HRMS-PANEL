@@ -61,28 +61,15 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
   // Fetch all reference data
   const fetchReferenceData = async () => {
     try {
-      const [
-        managersResponse,
-        deptResponse,
-        desigResponse,
-        statusResponse,
-        locationResponse,
-        shiftResponse
-      ] = await Promise.all([
-        employeeAPI.getManagers(),
-        departmentAPI.getAll({ limit: 100 }),
-        designationAPI.getAll({ limit: 100 }),
-        employmentStatusAPI.getAll({ limit: 100 }),
-        officeLocationAPI.getAll(),
-        workShiftAPI.getAllWithoutFilters()
-      ]);
-
-      setManagers(managersResponse.data.managers || []);
-      setDepartments(deptResponse.data.departments || []);
-      setDesignations(desigResponse.data.designations || []);
-      setEmploymentStatuses(statusResponse.data.employmentStatuses || []);
-      setOfficeLocations(locationResponse.data.officeLocations || []);
-      setWorkShifts(shiftResponse.data || []);
+      const response = await employeeAPI.getFormData();
+      const { departments, designations, employmentStatuses, officeLocations, workShifts, managers } = response.data;
+      
+      setManagers(managers || []);
+      setDepartments(departments || []);
+      setDesignations(designations || []);
+      setEmploymentStatuses(employmentStatuses || []);
+      setOfficeLocations(officeLocations || []);
+      setWorkShifts(workShifts || []);
     } catch (err) {
       console.error("Error fetching reference data:", err);
     }
@@ -160,9 +147,9 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
       // Remove confirmPassword before sending
       delete submitData.confirmPassword;
 
-      const { data } = await employeeAPI.register(submitData);
-      toast.success(message.message)
-      onEmployeeCreated(data.employee);
+      const response = await employeeAPI.register(submitData);
+      toast.success(response.data.message || "Employee created successfully!");
+      onEmployeeCreated(response.data.employee);
       onClose();
       
       // Reset form
@@ -195,8 +182,8 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
       });
 
     } catch (err) {
-      console.log(err)
-      toast.error(err.response?.data?.message)
+      console.log(err);
+      toast.error(err.response?.data?.message || "Error creating employee");
       setError(err.response?.data?.message || err.message || "Error creating employee");
     } finally {
       setLoading(false);
@@ -205,8 +192,17 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
 
   if (!isOpen) return null;
 
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      onClick={handleBackdropClick}
+    >
       <div 
         className="rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
         style={{

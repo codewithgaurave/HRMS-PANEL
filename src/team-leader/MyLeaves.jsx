@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import apiRoutes from '../contants/api';
 import { 
   Calendar,
   Clock,
@@ -29,7 +30,7 @@ const MyLeaves = () => {
       const token = localStorage.getItem('hrms-token');
       console.log('Team Leader - Fetching leaves with token:', token ? 'Present' : 'Missing');
       
-      const response = await fetch('http://localhost:5000/api/leaves/my-leaves', {
+      const response = await fetch(`${apiRoutes.leaves}/my-leaves`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -72,7 +73,7 @@ const MyLeaves = () => {
     e.preventDefault();
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/leaves', {
+      const response = await fetch(apiRoutes.leaves, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

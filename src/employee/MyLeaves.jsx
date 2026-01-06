@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import apiRoutes from '../contants/api';
 
 const MyLeaves = () => {
   const [leaves, setLeaves] = useState([]);
@@ -30,7 +31,7 @@ const MyLeaves = () => {
       }
 
       console.log('Making API call to my-leaves...');
-      const response = await fetch('http://localhost:5000/api/leaves/my-leaves', {
+      const response = await fetch(`${apiRoutes.leaves}/my-leaves`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -60,7 +61,7 @@ const MyLeaves = () => {
   const fetchLeaveTypes = async () => {
     try {
       const token = localStorage.getItem('hrms-token');
-      const response = await fetch('http://localhost:5000/api/leaves/available-types', {
+      const response = await fetch(`${apiRoutes.leaves}/available-types`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -95,7 +96,7 @@ const MyLeaves = () => {
   const handleApplyLeave = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/leaves', {
+      const response = await fetch(apiRoutes.leaves, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -36,6 +36,9 @@ const LeavesManagement = () => {
     limit: 10
   });
 
+  const [searchTerm, setSearchTerm] = useState(""); // Frontend search
+  const [allLeaves, setAllLeaves] = useState([]); // Store all leaves for filtering
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -64,8 +67,17 @@ const LeavesManagement = () => {
       setLoading(true);
       setError(null);
       
-      const { data } = await leaveAPI.getMyAndTeamLeaves(filters);
-      setLeaves(data.leaves || []);
+      // Remove employeeId from backend filters to avoid errors
+      const backendFilters = { ...filters };
+      delete backendFilters.employeeId;
+      
+      console.log('🔍 Fetching leaves with filters:', backendFilters);
+      const { data } = await leaveAPI.getMyAndTeamLeaves(backendFilters);
+      console.log('📊 API Response:', data);
+      console.log('📋 Leaves count:', data.leaves?.length || 0);
+      console.log('📈 Statistics:', data.statistics);
+      
+      setAllLeaves(data.leaves || []); // Store all leaves
       setPagination(data.pagination || {});
       
       // Update stats from the response
@@ -99,8 +111,30 @@ const LeavesManagement = () => {
     }
   };
 
+  // Frontend filtering function
+  const getFilteredLeaves = () => {
+    let filtered = [...allLeaves];
+    
+    // Filter by search term (employee ID or name)
+    if (searchTerm) {
+      filtered = filtered.filter(leave => {
+        const employeeName = getEmployeeName(leave.employee).toLowerCase();
+        const employeeId = leave.employee?.employeeId?.toLowerCase() || '';
+        const search = searchTerm.toLowerCase();
+        return employeeName.includes(search) || employeeId.includes(search);
+      });
+    }
+    
+    return filtered;
+  };
+
   // Handle filter changes
   const handleFilterChange = (key, value) => {
+    if (key === 'employeeId') {
+      setSearchTerm(value); // Handle search separately
+      return;
+    }
+    
     setFilters(prev => ({
       ...prev,
       [key]: value,
@@ -239,6 +273,7 @@ const LeavesManagement = () => {
       page: 1,
       limit: 10
     });
+    setSearchTerm("");
   };
 
   // Get sort icon
@@ -280,7 +315,12 @@ const LeavesManagement = () => {
 
   useEffect(() => {
     fetchLeaves();
-  }, [filters]);
+  }, [filters.status, filters.leaveType, filters.startDate, filters.endDate, filters.sortBy, filters.sortOrder, filters.page, filters.limit]);
+
+  // Update leaves when allLeaves or searchTerm changes
+  useEffect(() => {
+    setLeaves(getFilteredLeaves());
+  }, [allLeaves, searchTerm]);
 
   if (loading && leaves.length === 0) {
     return (
@@ -480,12 +520,12 @@ const LeavesManagement = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Employee ID</label>
+            <label className="block text-sm font-medium mb-2">Search Employee</label>
             <input
               type="text"
-              value={filters.employeeId}
-              onChange={(e) => handleFilterChange('employeeId', e.target.value)}
-              placeholder="Search by employee ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by employee ID or name..."
               className="w-full p-2 rounded-md border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-opacity-50"
               style={{ 
                 backgroundColor: themeColors.background, 

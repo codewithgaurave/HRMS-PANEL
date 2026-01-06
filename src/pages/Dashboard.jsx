@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import dashboardAPI from "../apis/dashboardAPI";
 import enhancedDashboardAPI from "../apis/enhancedDashboardAPI";
+import hrAnalyticsAPI from "../apis/hrAnalyticsAPI";
+import hrSummaryAPI from "../apis/hrSummaryAPI";
 import attendanceAPI from "../apis/attendanceAPI";
 import { getCurrentLocation } from "../utils/locationUtils";
 import { toast } from "sonner";
@@ -61,7 +63,225 @@ const Dashboard = () => {
       setLoading(true);
       console.log('Fetching dashboard data...');
       
-      // Use enhanced dashboard for HR, regular dashboard for others
+      // Try HR Summary API first for HR Manager role
+      try {
+        const hrSummaryResponse = await hrSummaryAPI.getHRSummary();
+        console.log('HR Summary response:', hrSummaryResponse);
+        
+        if (hrSummaryResponse.data.success && hrSummaryResponse.data.data) {
+          console.log('✅ HR Summary data received:', hrSummaryResponse.data.data);
+          
+          const summaryData = hrSummaryResponse.data.data;
+          
+          // Transform HR summary data to dashboard format
+          const transformedStats = {
+            data: {
+              overview: {
+                totalEmployees: summaryData.teamSize || 1,
+                activeEmployees: summaryData.teamSize || 1,
+                inactiveEmployees: 0,
+                newEmployeesThisMonth: 0,
+                pendingLeaves: summaryData.pendingLeaves || 0,
+                employeeGrowth: 0,
+                totalAssets: 0,
+                assignedAssets: 0,
+                availableAssets: 0,
+                teamSize: summaryData.teamSize || 1,
+                totalSalaryBudget: summaryData.teamSalaryBudget || 0
+              },
+              attendance: {
+                today: {
+                  present: summaryData.todayAttendance?.present || 0,
+                  absent: Math.max(0, (summaryData.teamSize || 1) - (summaryData.todayAttendance?.present || 0)),
+                  late: 0,
+                  halfDay: 0,
+                  rate: summaryData.todayAttendance?.percentage || 0,
+                  totalEmployees: summaryData.teamSize || 1
+                },
+                week: {
+                  present: summaryData.todayAttendance?.present || 0,
+                  absent: 0,
+                  late: 0,
+                  halfDay: 0,
+                  rate: summaryData.todayAttendance?.percentage || 0,
+                  totalEmployees: summaryData.teamSize || 1
+                },
+                month: {
+                  present: summaryData.todayAttendance?.present || 0,
+                  absent: 0,
+                  late: 0,
+                  halfDay: 0,
+                  rate: summaryData.todayAttendance?.percentage || 0,
+                  totalEmployees: summaryData.teamSize || 1
+                },
+                trends: []
+              },
+              leaves: {
+                pending: summaryData.pendingLeaves || 0,
+                approvedThisMonth: 0,
+                rejectedThisMonth: 0,
+                byType: [],
+                trends: [],
+                approvalRate: 0
+              },
+              assets: {
+                total: 0,
+                assigned: 0,
+                available: 0,
+                pendingRequests: 0,
+                byCategory: [],
+                utilizationRate: 0
+              },
+              payroll: {
+                totalThisMonth: summaryData.teamSalaryBudget || 0,
+                avgSalary: summaryData.teamSalaryBudget && summaryData.teamSize 
+                  ? Math.round(summaryData.teamSalaryBudget / summaryData.teamSize) 
+                  : 0,
+                salaryDistribution: []
+              },
+              departments: {
+                stats: [],
+                topPerforming: [],
+                attendanceByDept: []
+              },
+              workforce: {
+                roleDistribution: [],
+                designationStats: [],
+                locationStats: [],
+                shiftStats: []
+              },
+              performance: {
+                overtimeStats: { totalOvertime: 0, avgOvertime: 0, employeesWithOvertime: 0 },
+                avgWorkHours: 0,
+                productivityScore: 0
+              },
+              recentActivities: {
+                newEmployees: [],
+                recentLeaves: [],
+                upcomingEvents: [],
+                recentAnnouncements: []
+              },
+              alerts: []
+            }
+          };
+          
+          console.log('✅ Transformed HR Summary stats:', transformedStats.data.overview);
+          setStats(transformedStats);
+          setAnalytics({});
+          return;
+        }
+      } catch (hrSummaryError) {
+        console.log('HR Summary failed, trying HR Analytics:', hrSummaryError);
+      }
+      
+      // Try HR Analytics API for comprehensive data
+      try {
+        const hrAnalyticsResponse = await hrAnalyticsAPI.getHRAnalytics();
+        console.log('HR Analytics response:', hrAnalyticsResponse);
+        
+        if (hrAnalyticsResponse.success && hrAnalyticsResponse.data) {
+          console.log('✅ HR Analytics data received:', hrAnalyticsResponse.data);
+          
+          // Use HR analytics data directly - it's already properly structured
+          const transformedStats = {
+            data: {
+              overview: {
+                totalEmployees: hrAnalyticsResponse.data.employees.total || 1,
+                activeEmployees: hrAnalyticsResponse.data.employees.active || 1,
+                inactiveEmployees: hrAnalyticsResponse.data.employees.inactive || 0,
+                newEmployeesThisMonth: hrAnalyticsResponse.data.employees.newThisMonth || 0,
+                pendingLeaves: hrAnalyticsResponse.data.leaves.totalPending || 0,
+                employeeGrowth: hrAnalyticsResponse.data.employees.newThisMonth || 0,
+                totalAssets: hrAnalyticsResponse.data.assets.total || 0,
+                assignedAssets: hrAnalyticsResponse.data.assets.assigned || 0,
+                availableAssets: hrAnalyticsResponse.data.assets.available || 0
+              },
+              attendance: {
+                today: {
+                  present: hrAnalyticsResponse.data.attendance.todayPresent || 0,
+                  absent: Math.max(0, (hrAnalyticsResponse.data.employees.total || 1) - (hrAnalyticsResponse.data.attendance.todayPresent || 0)),
+                  late: hrAnalyticsResponse.data.attendance.monthlyStats.lateCount || 0,
+                  halfDay: 0,
+                  rate: parseFloat(hrAnalyticsResponse.data.attendance.attendanceRate) || 0,
+                  totalEmployees: hrAnalyticsResponse.data.employees.total || 1
+                },
+                week: {
+                  present: hrAnalyticsResponse.data.attendance.monthlyStats.presentCount || 0,
+                  absent: 0,
+                  late: hrAnalyticsResponse.data.attendance.monthlyStats.lateCount || 0,
+                  halfDay: 0,
+                  rate: parseFloat(hrAnalyticsResponse.data.attendance.attendanceRate) || 0,
+                  totalEmployees: hrAnalyticsResponse.data.employees.total || 1
+                },
+                month: {
+                  present: hrAnalyticsResponse.data.attendance.monthlyStats.presentCount || 0,
+                  absent: 0,
+                  late: hrAnalyticsResponse.data.attendance.monthlyStats.lateCount || 0,
+                  halfDay: 0,
+                  rate: parseFloat(hrAnalyticsResponse.data.attendance.attendanceRate) || 0,
+                  totalEmployees: hrAnalyticsResponse.data.employees.total || 1
+                },
+                trends: hrAnalyticsResponse.data.attendance.trend || []
+              },
+              leaves: {
+                pending: hrAnalyticsResponse.data.leaves.totalPending || 0,
+                approvedThisMonth: hrAnalyticsResponse.data.leaves.totalApproved || 0,
+                rejectedThisMonth: hrAnalyticsResponse.data.leaves.totalRejected || 0,
+                byType: hrAnalyticsResponse.data.leaves.byType || [],
+                trends: hrAnalyticsResponse.data.leaves.monthlyTrend || [],
+                approvalRate: hrAnalyticsResponse.data.performance.leaveApprovalRate || 0
+              },
+              assets: {
+                total: hrAnalyticsResponse.data.assets.total || 0,
+                assigned: hrAnalyticsResponse.data.assets.assigned || 0,
+                available: hrAnalyticsResponse.data.assets.available || 0,
+                pendingRequests: hrAnalyticsResponse.data.assets.pendingRequests || 0,
+                byCategory: hrAnalyticsResponse.data.assets.byCategory || [],
+                utilizationRate: hrAnalyticsResponse.data.assets.total > 0 
+                  ? ((hrAnalyticsResponse.data.assets.assigned / hrAnalyticsResponse.data.assets.total) * 100).toFixed(1)
+                  : 0
+              },
+              payroll: {
+                totalThisMonth: hrAnalyticsResponse.data.payroll.monthlyAmount || 0,
+                avgSalary: hrAnalyticsResponse.data.payroll.avgSalary || 0,
+                salaryDistribution: hrAnalyticsResponse.data.employees.salaryDistribution || []
+              },
+              departments: {
+                stats: hrAnalyticsResponse.data.employees.byDepartment || [],
+                topPerforming: hrAnalyticsResponse.data.employees.byDepartment?.slice(0, 5) || [],
+                attendanceByDept: []
+              },
+              workforce: {
+                roleDistribution: hrAnalyticsResponse.data.employees.byRole || [],
+                designationStats: hrAnalyticsResponse.data.employees.byDesignation || [],
+                locationStats: [],
+                shiftStats: []
+              },
+              performance: {
+                overtimeStats: { totalOvertime: 0, avgOvertime: 0, employeesWithOvertime: 0 },
+                avgWorkHours: hrAnalyticsResponse.data.attendance.monthlyStats.avgHours || 0,
+                productivityScore: hrAnalyticsResponse.data.performance.taskCompletionRate || 46
+              },
+              recentActivities: {
+                newEmployees: [],
+                recentLeaves: [],
+                upcomingEvents: [],
+                recentAnnouncements: []
+              },
+              alerts: []
+            }
+          };
+          
+          console.log('✅ Transformed stats:', transformedStats.data.overview);
+          setStats(transformedStats);
+          setAnalytics(hrAnalyticsResponse.data);
+          return;
+        }
+      } catch (hrError) {
+        console.log('HR Analytics failed, trying enhanced dashboard:', hrError);
+      }
+      
+      // Fallback to enhanced dashboard for HR, regular dashboard for others
       try {
         const enhancedResponse = await enhancedDashboardAPI.getEnhancedHRStats();
         console.log('Enhanced HR stats response:', enhancedResponse);
@@ -202,24 +422,24 @@ const Dashboard = () => {
   // Safe access to stats with defaults - handle enhanced dashboard structure
   const safeStats = {
     overview: {
-      totalEmployees: stats.data?.overview?.totalEmployees || stats.overview?.totalEmployees || stats.overview?.teamSize || 1,
-      activeEmployees: stats.data?.overview?.activeEmployees || stats.overview?.activeEmployees || stats.overview?.activeTeamMembers || 1,
+      totalEmployees: stats.data?.overview?.totalEmployees || stats.overview?.totalEmployees || stats.overview?.teamSize || stats.data?.overview?.teamSize || 1,
+      activeEmployees: stats.data?.overview?.activeEmployees || stats.overview?.activeEmployees || stats.overview?.activeTeamMembers || stats.data?.overview?.teamSize || 1,
       inactiveEmployees: stats.data?.overview?.inactiveEmployees || stats.overview?.inactiveEmployees || 0,
       newEmployeesThisMonth: stats.data?.overview?.newEmployeesThisMonth || stats.overview?.newEmployeesThisMonth || 0,
-      pendingLeaves: stats.data?.overview?.pendingLeaves || stats.overview?.pendingLeaves || 0,
+      pendingLeaves: stats.data?.overview?.pendingLeaves || stats.overview?.pendingLeaves || stats.data?.leaves?.pending || 0,
       employeeGrowth: stats.data?.overview?.employeeGrowth || stats.overview?.employeeGrowth || 0,
       totalAssets: stats.data?.overview?.totalAssets || stats.overview?.totalAssets || 0,
       assignedAssets: stats.data?.overview?.assignedAssets || stats.overview?.assignedAssets || 0,
       availableAssets: stats.data?.overview?.availableAssets || stats.overview?.availableAssets || 0,
       // Team Leader specific fields
-      teamSize: Math.max(stats.overview?.teamSize || 0, 1),
-      activeTeamMembers: Math.max(stats.overview?.activeTeamMembers || 0, 1),
-      todayPresent: stats.overview?.todayPresent || 0,
-      todayAbsent: stats.overview?.todayAbsent || 0,
+      teamSize: Math.max(stats.data?.overview?.teamSize || stats.overview?.teamSize || stats.data?.overview?.totalEmployees || 0, 1),
+      activeTeamMembers: Math.max(stats.overview?.activeTeamMembers || stats.data?.overview?.activeEmployees || 0, 1),
+      todayPresent: stats.overview?.todayPresent || stats.data?.attendance?.today?.present || 0,
+      todayAbsent: stats.overview?.todayAbsent || stats.data?.attendance?.today?.absent || 0,
       approvedLeaves: stats.overview?.approvedLeaves || 0,
       rejectedLeaves: stats.overview?.rejectedLeaves || 0,
-      totalSalaryBudget: stats.overview?.totalSalaryBudget || 0,
-      avgTeamSalary: stats.overview?.avgTeamSalary || 0
+      totalSalaryBudget: stats.data?.overview?.totalSalaryBudget || stats.overview?.totalSalaryBudget || stats.data?.payroll?.totalThisMonth || 0,
+      avgTeamSalary: stats.overview?.avgTeamSalary || stats.data?.payroll?.avgSalary || 0
     },
     attendance: {
       today: {
@@ -331,12 +551,34 @@ const Dashboard = () => {
             })}
           </p>
         </div>
-        <div className="text-lg font-medium mt-2 md:mt-0" style={{ color: themeColors.primary }}>
-          {time.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            second: '2-digit'
-          })}
+        <div className="flex items-center gap-4 mt-2 md:mt-0">
+          <button
+            onClick={async () => {
+              try {
+                const debugResponse = await dashboardAPI.debugDashboardData();
+                console.log('🔍 Debug Response:', debugResponse.data);
+                toast.success('Debug data logged to console');
+              } catch (err) {
+                console.error('Debug failed:', err);
+                toast.error('Debug failed');
+              }
+            }}
+            className="px-3 py-1 text-xs rounded border"
+            style={{ 
+              backgroundColor: themeColors.background,
+              borderColor: themeColors.border,
+              color: themeColors.text
+            }}
+          >
+            🔍 Debug
+          </button>
+          <div className="text-lg font-medium" style={{ color: themeColors.primary }}>
+            {time.toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              second: '2-digit'
+            })}
+          </div>
         </div>
       </div>
 

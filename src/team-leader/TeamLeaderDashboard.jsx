@@ -1,7 +1,12 @@
 // src/pages/TeamLeaderDashboard.jsx
 import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import dashboardAPI from "../apis/dashboardAPI";
+import enhancedDashboardAPI from "../apis/enhancedDashboardAPI";
+import hrAnalyticsAPI from "../apis/hrAnalyticsAPI";
+import attendanceAPI from "../apis/attendanceAPI";
+import { getCurrentLocation } from "../utils/locationUtils";
 import { toast } from "sonner";
 import {
   Users,
@@ -15,7 +20,14 @@ import {
   UserCheck,
   UserX,
   Coffee,
-  CheckCircle
+  CheckCircle,
+  MapPin,
+  Navigation,
+  LogIn,
+  LogOut,
+  Package,
+  IndianRupee,
+  AlertTriangle
 } from "lucide-react";
 
 // Chart components
@@ -37,10 +49,19 @@ import {
 
 const TeamLeaderDashboard = () => {
   const { themeColors } = useTheme();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [time, setTime] = useState(new Date());
+
+  // Punch in/out states
+  const [punchLoading, setPunchLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [todayAttendance, setTodayAttendance] = useState(null);
+  const [showPunchConfirmation, setShowPunchConfirmation] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -49,18 +70,72 @@ const TeamLeaderDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchTodayAttendance();
+    fetchCurrentLocation();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await dashboardAPI.getDashboardStats();
-      setStats(response.data.stats);
+      console.log('Fetching team leader dashboard data...');
+      
+      // Try enhanced dashboard API first
+      try {
+        const enhancedResponse = await enhancedDashboardAPI.getEnhancedDashboard();
+        console.log('Enhanced dashboard response:', enhancedResponse);
+        
+        if (enhancedResponse.data && enhancedResponse.data.data) {
+          console.log('✅ Enhanced dashboard data received:', enhancedResponse.data.data);
+          setStats(enhancedResponse.data);
+          setAnalytics(enhancedResponse.data.data.analytics || {});
+          return;
+        }
+      } catch (enhancedError) {
+        console.log('Enhanced dashboard failed, trying regular dashboard:', enhancedError);
+      }
+      
+      // Fallback to regular dashboard API
+      try {
+        const response = await dashboardAPI.getDashboardStats();
+        console.log('Regular dashboard response:', response);
+        
+        if (response.data && response.data.stats) {
+          console.log('✅ Regular dashboard data received:', response.data.stats);
+          setStats(response.data);
+          setAnalytics(response.data.stats.analytics || {});
+        }
+      } catch (regularError) {
+        console.log('Regular dashboard also failed:', regularError);
+        throw regularError;
+      }
+      
     } catch (err) {
+      console.error('Dashboard fetch error:', err);
       setError(err.response?.data?.message || "Failed to fetch dashboard data");
       toast.error("Failed to load team dashboard data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTodayAttendance = async () => {
+    try {
+      const response = await attendanceAPI.getTodayAttendance();
+      setTodayAttendance(response.data.attendance);
+    } catch (error) {
+      console.error('Failed to fetch today attendance:', error);
+    }
+  };
+
+  const fetchCurrentLocation = async () => {
+    try {
+      setLocationLoading(true);
+      const location = await getCurrentLocation();
+      setCurrentLocation(location);
+    } catch (error) {
+      console.error('Failed to get location:', error);
+    } finally {
+      setLocationLoading(false);
     }
   };
 

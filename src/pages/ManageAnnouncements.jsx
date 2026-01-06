@@ -67,13 +67,12 @@ const ManageAnnouncements = () => {
   useEffect(() => {
     fetchAnnouncements();
     fetchStats();
+  }, [filters]);
+
+  useEffect(() => {
     fetchDepartments();
     fetchDesignations();
-    // Temporarily disable HR-scoped data fetching
-    // if (user?.role === 'HR_Manager') {
-    //   fetchHRManagedData();
-    // }
-  }, [filters, user]);
+  }, []);
 
   const fetchHRManagedData = async () => {
     try {
@@ -89,17 +88,34 @@ const ManageAnnouncements = () => {
       setLoading(true);
       setError(null);
       
+      // Remove status filter from API call - do frontend filtering instead
+      const apiFilters = {
+        category: filters.category,
+        page: filters.page,
+        limit: filters.limit
+      };
+      
       let response;
       // Use different endpoints based on user role
       if (user?.role === 'HR_Manager') {
         // HR sees only announcements they created
-        response = await announcementAPI.getMyCreated(filters);
+        response = await announcementAPI.getMyCreated(apiFilters);
       } else {
         // Team Leaders and Employees see announcements from their HR
-        response = await announcementAPI.getEmployeeFiltered(filters);
+        response = await announcementAPI.getEmployeeFiltered(apiFilters);
       }
       
-      setAnnouncements(response.data.announcements);
+      let fetchedAnnouncements = response.data.announcements;
+      
+      // Apply frontend status filtering
+      if (filters.isActive !== "") {
+        const statusFilter = filters.isActive === "true";
+        fetchedAnnouncements = fetchedAnnouncements.filter(announcement => 
+          announcement.isActive === statusFilter
+        );
+      }
+      
+      setAnnouncements(fetchedAnnouncements);
       setPagination(response.data.pagination);
     } catch (err) {
       console.log(err);

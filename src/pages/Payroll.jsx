@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import payrollAPI from "../apis/payrollAPI";
 import employeeAPI from "../apis/employeeAPI";
-import { Plus, Edit, Trash2, DollarSign, Calendar, Users, Download } from "lucide-react";
+import { toast } from "sonner";
+import { Plus, Edit, Trash2, DollarSign, Calendar, Users, Download, RefreshCw } from "lucide-react";
 
 const Payroll = () => {
   const { themeColors } = useTheme();
@@ -14,7 +15,7 @@ const Payroll = () => {
   const [editingPayroll, setEditingPayroll] = useState(null);
 
   const [filters, setFilters] = useState({
-    month: new Date().getMonth() + 1,
+    month: "", // Changed to empty string for "All Months" by default
     year: new Date().getFullYear(),
     status: "",
     page: 1,
@@ -95,15 +96,28 @@ const Payroll = () => {
       
       if (editingPayroll) {
         await payrollAPI.update(editingPayroll._id, payrollData);
+        toast.success("Payroll updated successfully!");
       } else {
         await payrollAPI.create(payrollData);
+        toast.success("Payroll created successfully!");
       }
       
       setShowModal(false);
       fetchPayrolls();
       resetForm();
     } catch (err) {
-      setError(err.response?.data?.message || "Error saving payroll");
+      // Check for duplicate key error
+      if (err.response?.data?.message?.includes('E11000 duplicate key error') || 
+          err.response?.data?.message?.includes('duplicate key')) {
+        const selectedEmployee = employees.find(emp => emp._id === formData.employee);
+        const monthName = new Date(0, formData.month - 1).toLocaleString('default', { month: 'long' });
+        
+        toast.error(`Payroll already exists for ${selectedEmployee?.name?.first} ${selectedEmployee?.name?.last} for ${monthName} ${formData.year}`);
+        setShowModal(false);
+        resetForm();
+      } else {
+        toast.error(err.response?.data?.message || "Error saving payroll");
+      }
     }
   };
 
@@ -128,6 +142,16 @@ const Payroll = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Error generating payrolls");
     }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      month: "",
+      year: new Date().getFullYear(),
+      status: "",
+      page: 1,
+      limit: 10
+    });
   };
 
   const resetForm = () => {
@@ -220,6 +244,7 @@ const Payroll = () => {
           className="px-3 py-2 rounded border"
           style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
         >
+          <option value="">All Months</option>
           {Array.from({ length: 12 }, (_, i) => (
             <option key={i + 1} value={i + 1}>
               {new Date(0, i).toLocaleString('default', { month: 'long' })}
@@ -249,6 +274,18 @@ const Payroll = () => {
           <option value="Processed">Processed</option>
           <option value="Paid">Paid</option>
         </select>
+        <button
+          onClick={clearFilters}
+          className="px-4 py-2 rounded border font-medium transition-colors hover:opacity-90 flex items-center gap-2"
+          style={{
+            backgroundColor: themeColors.background,
+            borderColor: themeColors.warning,
+            color: themeColors.warning
+          }}
+        >
+          <RefreshCw size={16} />
+          Clear Filters
+        </button>
       </div>
 
       {/* Error Display */}

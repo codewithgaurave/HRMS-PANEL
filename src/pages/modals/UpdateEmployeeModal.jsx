@@ -43,7 +43,8 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
     officeLocation: "",
     workShift: "",
     salary: "",
-    dateOfJoining: ""
+    dateOfJoining: "",
+    allowedPunchInRange: 500
   });
 
   // Fetch all reference data
@@ -110,7 +111,8 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
         officeLocation: employee.officeLocation?._id || "",
         workShift: employee.workShift?._id || "",
         salary: employee.salary || "",
-        dateOfJoining: employee.dateOfJoining ? new Date(employee.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        dateOfJoining: employee.dateOfJoining ? new Date(employee.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        allowedPunchInRange: employee.allowedPunchInRange || 500
       });
     }
   }, [employee, isOpen]);
@@ -157,6 +159,7 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
       const updateData = {
         ...formData,
         salary: Number(formData.salary),
+        allowedPunchInRange: Number(formData.allowedPunchInRange) || 500,
         // Convert empty strings to undefined for optional fields
         gender: formData.gender || undefined,
         dob: formData.dob || undefined,
@@ -658,6 +661,33 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
                     color: themeColors.text
                   }}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Punch-In Range (meters)
+                  <span className="text-xs ml-2" style={{ color: themeColors.textSecondary }}>
+                    (10m - 10,000m)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  name="allowedPunchInRange"
+                  value={formData.allowedPunchInRange}
+                  onChange={handleInputChange}
+                  min="10"
+                  max="10000"
+                  placeholder="500"
+                  className="w-full p-2 rounded-md border text-sm"
+                  style={{
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.border,
+                    color: themeColors.text
+                  }}
+                />
+                <p className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
+                  Default: 500m. Employee can punch-in within this range from office.
+                </p>
               </div>
             </div>
           </div>

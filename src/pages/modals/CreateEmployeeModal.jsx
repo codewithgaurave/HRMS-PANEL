@@ -52,6 +52,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
     workShift: "",
     salary: "",
     dateOfJoining: new Date().toISOString().split('T')[0],
+    allowedPunchInRange: 500,
     
     // Authentication
     password: "",
@@ -135,6 +136,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
       const submitData = {
         ...formData,
         salary: Number(formData.salary),
+        allowedPunchInRange: Number(formData.allowedPunchInRange) || 500,
         // Convert empty strings to undefined for optional fields
         gender: formData.gender || undefined,
         dob: formData.dob || undefined,
@@ -177,6 +179,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
         workShift: "",
         salary: "",
         dateOfJoining: new Date().toISOString().split('T')[0],
+        allowedPunchInRange: 500,
         password: "",
         confirmPassword: ""
       });
@@ -668,6 +671,33 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
                     color: themeColors.text
                   }}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Punch-In Range (meters)
+                  <span className="text-xs ml-2" style={{ color: themeColors.textSecondary }}>
+                    (10m - 10,000m)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  name="allowedPunchInRange"
+                  value={formData.allowedPunchInRange}
+                  onChange={handleInputChange}
+                  min="10"
+                  max="10000"
+                  placeholder="500"
+                  className="w-full p-2 rounded-md border text-sm"
+                  style={{
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.border,
+                    color: themeColors.text
+                  }}
+                />
+                <p className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
+                  Default: 500m. Employee can punch-in within this range from office.
+                </p>
               </div>
 
               {/* Authentication */}

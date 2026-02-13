@@ -22,13 +22,16 @@ import PersonalInfoSection from './employeeProfile/PersonalInfoSection';
 import EmployeeAttendanceDetails from './employeeProfile/EmployeeAttendanceDetails';
 
 const EmployeeProfile = () => {
-  const { id } = useParams();
+  const { id: urlId } = useParams();
   const navigate = useNavigate();
   const { themeColors } = useTheme();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('basic-info');
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Use URL id if available, otherwise use logged-in user's id
+  const id = urlId || user?._id;
 
   // Master data states
   const [departments, setDepartments] = useState([]);
@@ -42,11 +45,15 @@ const EmployeeProfile = () => {
   const fetchEmployeeData = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching employee with ID:', id);
+      console.log('👤 Current user:', user);
       const response = await employeeAPI.getById(id);
+      console.log('✅ Employee data fetched:', response.data.employee);
       setEmployee(response.data.employee);
     } catch (err) {
-      console.error('Error fetching employee:', err);
-      toast.error('Failed to fetch employee data');
+      console.error('❌ Error fetching employee:', err);
+      console.error('❌ Error response:', err.response?.data);
+      toast.error(err.response?.data?.message || 'Failed to fetch employee data');
     } finally {
       setLoading(false);
     }
@@ -103,13 +110,22 @@ const EmployeeProfile = () => {
   };
 
   useEffect(() => {
-    fetchEmployeeData();
-    fetchMasterData();
+    if (id) {
+      fetchEmployeeData();
+      fetchMasterData();
+    }
   }, [id]);
 
   // Handle section updates with role-based permissions
   const handleSectionUpdate = async (section, data) => {
     try {
+      console.log('🔧 Updating section:', section);
+      console.log('📝 Data:', data);
+      console.log('🆔 Employee ID being used:', id);
+      console.log('🆔 Employee._id:', employee?._id);
+      console.log('👤 User role:', user?.role);
+      console.log('🔐 Is own profile:', employee?._id === user?._id);
+      
       // Check if current user can edit this section
       const canEdit = canEditSection(section, user?.role, employee?._id, user?._id);
       if (!canEdit) {
@@ -118,57 +134,67 @@ const EmployeeProfile = () => {
       }
 
       let response;
-      switch (section) {
-        case 'basic-info':
-          response = await employeeAPI.updateBasicInfo(id, data);
-          break;
-        case 'address':
-          response = await employeeAPI.updateAddress(id, data);
-          break;
-        case 'employment-details':
-          response = await employeeAPI.updateEmploymentDetails(id, data);
-          break;
-        case 'bank-details':
-          response = await employeeAPI.updateBankDetails(id, data);
-          break;
-        case 'documents':
-          response = await employeeAPI.updateDocuments(id, data);
-          break;
-        case 'emergency-contact':
-          response = await employeeAPI.updateEmergencyContact(id, data);
-          break;
-        case 'personal-info':
-          response = await employeeAPI.updatePersonalInfo(id, data);
-          break;
-        default:
-          throw new Error('Invalid section');
+      
+      // If employee is updating their own profile, use my-profile endpoint
+      if (user?.role === 'Employee' && employee?._id === user?._id) {
+        console.log('✅ Using my-profile endpoint for Employee');
+        response = await employeeAPI.updateMyProfile(section, data);
+      } else {
+        // HR Manager or Team Leader updating someone else's profile
+        const employeeId = employee?._id;
+        console.log('✅ Using employee ID:', employeeId);
+        
+        switch (section) {
+          case 'basic-info':
+            response = await employeeAPI.updateBasicInfo(employeeId, data);
+            break;
+          case 'address':
+            response = await employeeAPI.updateAddress(employeeId, data);
+            break;
+          case 'employment-details':
+            response = await employeeAPI.updateEmploymentDetails(employeeId, data);
+            break;
+          case 'bank-details':
+            response = await employeeAPI.updateBankDetails(employeeId, data);
+            break;
+          case 'documents':
+            response = await employeeAPI.updateDocuments(employeeId, data);
+            break;
+          case 'emergency-contact':
+            response = await employeeAPI.updateEmergencyContact(employeeId, data);
+            break;
+          case 'personal-info':
+            response = await employeeAPI.updatePersonalInfo(employeeId, data);
+            break;
+          default:
+            throw new Error('Invalid section');
+        }
       }
 
       setEmployee(response.data.employee);
       toast.success(`${section.replace('-', ' ')} updated successfully!`);
     } catch (err) {
-      console.error('Update error:', err);
+      console.error('❌ Update error:', err);
+      console.error('❌ Error response:', err.response?.data);
       toast.error(err.response?.data?.message || `Failed to update ${section}`);
     }
   };
 
   // Check if user can edit a specific section
   const canEditSection = (section, userRole, employeeId, currentUserId) => {
+    // Employee CANNOT edit anything
+    if (userRole === 'Employee') {
+      return false;
+    }
+    
+    // Team Leader CANNOT edit anything (including their own profile)
+    if (userRole === 'Team_Leader') {
+      return false;
+    }
+    
     // HR Manager can edit everything
     if (userRole === 'HR_Manager') {
       return true;
-    }
-    
-    // Team Leader can edit their own profile except attendance and employment-details
-    if (userRole === 'Team_Leader' && employeeId === currentUserId) {
-      const restrictedSections = ['attendance', 'employment-details'];
-      return !restrictedSections.includes(section);
-    }
-    
-    // Employee can edit their own profile except attendance and employment-details
-    if (userRole === 'Employee' && employeeId === currentUserId) {
-      const restrictedSections = ['attendance', 'employment-details'];
-      return !restrictedSections.includes(section);
     }
     
     return false;
@@ -320,7 +346,7 @@ const EmployeeProfile = () => {
               <BasicInfoSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('basic-info', data)}
-                canEdit={canEditSection('basic-info', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('basic-info', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -328,7 +354,7 @@ const EmployeeProfile = () => {
               <AddressSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('address', data)}
-                canEdit={canEditSection('address', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('address', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -342,7 +368,7 @@ const EmployeeProfile = () => {
                 workShifts={workShifts}
                 managers={managers}
                 onUpdate={(data) => handleSectionUpdate('employment-details', data)}
-                canEdit={canEditSection('employment-details', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('employment-details', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -350,7 +376,7 @@ const EmployeeProfile = () => {
               <BankDetailsSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('bank-details', data)}
-                canEdit={canEditSection('bank-details', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('bank-details', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -358,7 +384,7 @@ const EmployeeProfile = () => {
               <DocumentsSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('documents', data)}
-                canEdit={canEditSection('documents', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('documents', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -366,7 +392,7 @@ const EmployeeProfile = () => {
               <EmergencyContactSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('emergency-contact', data)}
-                canEdit={canEditSection('emergency-contact', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('emergency-contact', user?.role, employee?._id, user?._id)}
               />
             )}
 
@@ -374,7 +400,7 @@ const EmployeeProfile = () => {
               <PersonalInfoSection
                 employee={employee}
                 onUpdate={(data) => handleSectionUpdate('personal-info', data)}
-                canEdit={canEditSection('personal-info', user?.role, employee?._id, user?._id)}
+                canEdit={user?.role !== 'Employee' && canEditSection('personal-info', user?.role, employee?._id, user?._id)}
               />
             )}
 

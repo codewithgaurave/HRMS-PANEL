@@ -7,6 +7,7 @@ import {
   Filter, Download, Eye, UserPlus, RotateCcw 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 
 const AssetManagement = () => {
   const { themeColors } = useTheme();
@@ -27,8 +28,12 @@ const AssetManagement = () => {
     status: "",
     condition: "",
     page: 1,
-    limit: 10
+    limit: 1000
   });
+
+  // Frontend pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -102,11 +107,57 @@ const AssetManagement = () => {
 
   const handleAssign = async (employeeId) => {
     try {
+      // Check if asset is already assigned
+      const activeAssignments = selectedAsset.assignedTo?.filter(a => a.isActive) || [];
+      
+      if (activeAssignments.length > 0) {
+        const currentEmployee = activeAssignments[0].employee;
+        const currentName = `${currentEmployee?.name?.first || ''} ${currentEmployee?.name?.last || ''}`;
+        
+        // Show SweetAlert confirmation
+        const result = await Swal.fire({
+          title: 'Asset Already Assigned!',
+          html: `
+            <div style="text-align: left;">
+              <p><strong>${selectedAsset.name}</strong> is currently assigned to:</p>
+              <p style="margin: 10px 0; padding: 10px; background: #f3f4f6; border-radius: 8px;">
+                <strong>${currentName}</strong><br/>
+                <small>${currentEmployee?.employeeId || ''} - ${currentEmployee?.designation?.title || ''}</small>
+              </p>
+              <p>Do you want to transfer this asset to another employee?</p>
+            </div>
+          `,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Yes, Transfer Asset',
+          cancelButtonText: 'Cancel'
+        });
+        
+        if (!result.isConfirmed) {
+          return;
+        }
+      }
+      
       await assetAPI.assign(selectedAsset._id, employeeId);
       setShowAssignModal(false);
       fetchAssets();
+      
+      Swal.fire({
+        title: 'Success!',
+        text: 'Asset assigned successfully',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
     } catch (err) {
-      setError(err.response?.data?.message || "Error assigning asset");
+      Swal.fire({
+        title: 'Error!',
+        text: err.response?.data?.message || "Error assigning asset",
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
     }
   };
 
@@ -162,6 +213,13 @@ const AssetManagement = () => {
     return `px-3 py-1 rounded-full text-xs font-medium ${colors[status] || "bg-gray-100 text-gray-800"}`;
   };
 
+  // Frontend pagination calculation
+  const totalItems = assets.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startIndex = itemsPerPage === 'all' ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === 'all' ? totalItems : startIndex + itemsPerPage;
+  const paginatedAssets = assets.slice(startIndex, endIndex);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -214,7 +272,7 @@ const AssetManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {assets.map((asset) => (
+            {paginatedAssets.map((asset) => (
               <tr key={asset._id} className="border-b" style={{ borderColor: themeColors.border }}>
                 <td className="p-3 text-sm font-medium">{asset.assetId}</td>
                 <td className="p-3 text-sm">{asset.name}</td>
@@ -286,6 +344,68 @@ const AssetManagement = () => {
             ))}
           </tbody>
         </table>
+
+        {/* Pagination Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-center mt-4 gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">Show</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                const value = e.target.value;
+                setItemsPerPage(value === 'all' ? 'all' : parseInt(value));
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1 rounded-md border text-sm"
+              style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+              <option value="all">All</option>
+            </select>
+            <span className="text-sm">entries</span>
+          </div>
+
+          <div className="text-sm" style={{ color: themeColors.textSecondary }}>
+            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
+          </div>
+
+          {itemsPerPage !== 'all' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                  color: themeColors.text
+                }}
+              >
+                Previous
+              </button>
+              
+              <span className="text-sm px-3">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                  color: themeColors.text
+                }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create/Edit Modal */}

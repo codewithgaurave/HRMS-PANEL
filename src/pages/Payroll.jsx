@@ -22,6 +22,10 @@ const Payroll = () => {
     limit: 10
   });
 
+  // Frontend pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const [formData, setFormData] = useState({
     employee: "",
     month: new Date().getMonth() + 1,
@@ -35,7 +39,9 @@ const Payroll = () => {
     },
     deductions: {
       tax: "",
+      taxPercent: "",
       pf: "",
+      pfPercent: "",
       insurance: "",
       other: ""
     },
@@ -79,7 +85,15 @@ const Payroll = () => {
   const calculateSalary = () => {
     const basic = parseFloat(formData.basicSalary) || 0;
     const totalAllowances = Object.values(formData.allowances).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-    const totalDeductions = Object.values(formData.deductions).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+    
+    // Only count actual deduction amounts, not percentages
+    const totalDeductions = (
+      (parseFloat(formData.deductions.tax) || 0) +
+      (parseFloat(formData.deductions.pf) || 0) +
+      (parseFloat(formData.deductions.insurance) || 0) +
+      (parseFloat(formData.deductions.other) || 0)
+    );
+    
     const overtime = parseFloat(formData.overtimeAmount) || 0;
     
     const grossSalary = basic + totalAllowances + overtime;
@@ -133,14 +147,32 @@ const Payroll = () => {
   };
 
   const handleGenerateAll = async () => {
+    // Validate month is selected
+    if (!filters.month) {
+      toast.error('Please select the month first');
+      return;
+    }
+
+    // Check if payroll already exists for selected month
+    const monthName = new Date(0, filters.month - 1).toLocaleString('default', { month: 'long' });
+    const existingPayrolls = payrolls.filter(
+      p => p.month === parseInt(filters.month) && p.year === parseInt(filters.year)
+    );
+
+    if (existingPayrolls.length > 0) {
+      toast.error(`Payroll already generated for ${monthName} ${filters.year}`);
+      return;
+    }
+
     try {
       await payrollAPI.generateForAll({
         month: filters.month,
         year: filters.year
       });
+      toast.success(`Payrolls generated successfully for ${monthName} ${filters.year}!`);
       fetchPayrolls();
     } catch (err) {
-      setError(err.response?.data?.message || "Error generating payrolls");
+      toast.error(err.response?.data?.message || "Error generating payrolls");
     }
   };
 
@@ -152,7 +184,15 @@ const Payroll = () => {
       page: 1,
       limit: 10
     });
+    setCurrentPage(1);
   };
+
+  // Frontend pagination calculation
+  const totalItems = payrolls.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startIndex = itemsPerPage === 'all' ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === 'all' ? totalItems : startIndex + itemsPerPage;
+  const paginatedPayrolls = payrolls.slice(startIndex, endIndex);
 
   const resetForm = () => {
     setFormData({
@@ -161,7 +201,7 @@ const Payroll = () => {
       year: new Date().getFullYear(),
       basicSalary: "",
       allowances: { hra: "", transport: "", medical: "", other: "" },
-      deductions: { tax: "", pf: "", insurance: "", other: "" },
+      deductions: { tax: "", taxPercent: "", pf: "", pfPercent: "", insurance: "", other: "" },
       workingDays: 30,
       presentDays: 30,
       overtimeHours: 0,
@@ -312,7 +352,7 @@ const Payroll = () => {
             </tr>
           </thead>
           <tbody>
-            {payrolls.map((payroll) => (
+            {paginatedPayrolls.map((payroll) => (
               <tr key={payroll._id} className="border-b" style={{ borderColor: themeColors.border }}>
                 <td className="p-3 text-sm">
                   <div>
@@ -352,6 +392,68 @@ const Payroll = () => {
             ))}
           </tbody>
         </table>
+
+        {/* Pagination Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-center mt-4 gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">Show</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                const value = e.target.value;
+                setItemsPerPage(value === 'all' ? 'all' : parseInt(value));
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1 rounded-md border text-sm"
+              style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+              <option value="all">All</option>
+            </select>
+            <span className="text-sm">entries</span>
+          </div>
+
+          <div className="text-sm" style={{ color: themeColors.textSecondary }}>
+            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
+          </div>
+
+          {itemsPerPage !== 'all' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                  color: themeColors.text
+                }}
+              >
+                Previous
+              </button>
+              
+              <span className="text-sm px-3">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                  color: themeColors.text
+                }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create/Edit Modal */}
@@ -472,30 +574,62 @@ const Payroll = () => {
                   <h3 className="font-medium">Deductions</h3>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-sm font-medium mb-2">Tax</label>
+                      <label className="block text-sm font-medium mb-2">Tax (%)</label>
                       <input
                         type="number"
-                        value={formData.deductions.tax}
-                        onChange={(e) => setFormData(prev => ({ 
-                          ...prev, 
-                          deductions: { ...prev.deductions, tax: e.target.value }
-                        }))}
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="Enter %"
+                        value={formData.deductions.taxPercent}
+                        onChange={(e) => {
+                          const percent = parseFloat(e.target.value) || 0;
+                          const basicSalary = parseFloat(formData.basicSalary) || 0;
+                          const taxAmount = (basicSalary * percent) / 100;
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            deductions: { 
+                              ...prev.deductions, 
+                              taxPercent: e.target.value,
+                              tax: taxAmount
+                            }
+                          }));
+                        }}
                         className="w-full p-2 rounded-md border text-sm"
                         style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
                       />
+                      <div className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
+                        Amount: ₹{parseFloat(formData.deductions.tax || 0).toFixed(2)}
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">PF</label>
+                      <label className="block text-sm font-medium mb-2">PF (%)</label>
                       <input
                         type="number"
-                        value={formData.deductions.pf}
-                        onChange={(e) => setFormData(prev => ({ 
-                          ...prev, 
-                          deductions: { ...prev.deductions, pf: e.target.value }
-                        }))}
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="Enter %"
+                        value={formData.deductions.pfPercent}
+                        onChange={(e) => {
+                          const percent = parseFloat(e.target.value) || 0;
+                          const basicSalary = parseFloat(formData.basicSalary) || 0;
+                          const pfAmount = (basicSalary * percent) / 100;
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            deductions: { 
+                              ...prev.deductions, 
+                              pfPercent: e.target.value,
+                              pf: pfAmount
+                            }
+                          }));
+                        }}
                         className="w-full p-2 rounded-md border text-sm"
                         style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
                       />
+                      <div className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
+                        Amount: ₹{parseFloat(formData.deductions.pf || 0).toFixed(2)}
+                      </div>
                     </div>
                   </div>
                   <div>

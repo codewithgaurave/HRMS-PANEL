@@ -1,5 +1,6 @@
 // src/employee/EmployeeDashboard.jsx
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import dashboardAPI from "../apis/dashboardAPI";
 import attendanceAPI from "../apis/attendanceAPI";
@@ -18,7 +19,8 @@ import {
     Navigation,
     BarChart3,
     Award,
-    Coffee
+    Coffee,
+    History
 } from "lucide-react";
 
 // Chart components
@@ -40,6 +42,7 @@ import {
 
 const EmployeeDashboard = () => {
     const { themeColors } = useTheme();
+    const navigate = useNavigate();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -486,17 +489,22 @@ const EmployeeDashboard = () => {
                 <StatCard
                     icon={<Clock size={20} />}
                     title="Total Hours"
-                    value={`${stats.attendance?.month?.totalHours || 0}h`}
-                    subtitle={`${stats.attendance?.month?.overtimeHours || 0}h overtime`}
+                    value={`${(stats.attendance?.month?.totalHours || 0).toFixed(3)}h`}
+                    subtitle={`${(stats.attendance?.month?.overtimeHours || 0).toFixed(3)}h overtime`}
                     color="blue"
                 />
-                <StatCard
-                    icon={<Coffee size={20} />}
-                    title="Leave Balance"
-                    value={stats.leaves?.remaining || 0}
-                    subtitle={`${stats.leaves?.approvedThisYear || 0} taken this year`}
-                    color="orange"
-                />
+                <div 
+                    onClick={() => navigate('/transfer-history')}
+                    className="cursor-pointer"
+                >
+                    <StatCard
+                        icon={<History size={20} />}
+                        title="Transfer History"
+                        value="View"
+                        subtitle="Click to see asset transfers"
+                        color="purple"
+                    />
+                </div>
             </div>
 
             {/* Charts Section */}

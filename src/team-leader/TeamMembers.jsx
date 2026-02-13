@@ -3,6 +3,7 @@ import { useTheme } from "../context/ThemeContext";
 import employeeAPI from "../apis/employeeAPI";
 import { Eye, Mail, Phone } from "lucide-react";
 import SimpleEmployeeModal from "../components/SimpleEmployeeModal";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 const TeamMembers = () => {
   const { themeColors } = useTheme();

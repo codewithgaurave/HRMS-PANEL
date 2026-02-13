@@ -131,9 +131,12 @@ const TeamLeaderAttendance = () => {
   const fetchTodayAttendance = async () => {
     try {
       const { data } = await attendanceAPI.getTodayAttendance();
+      console.log('📅 Today Attendance Response:', data);
       setTodayAttendance(data.attendance);
     } catch (err) {
       console.error("Error fetching today's attendance:", err);
+      // Set empty state if no attendance found
+      setTodayAttendance(null);
     }
   };
 
@@ -180,9 +183,11 @@ const TeamLeaderAttendance = () => {
   const fetchSummary = async () => {
     try {
       const { data } = await attendanceAPI.getAttendanceSummary();
+      console.log('📊 My Attendance Summary:', data);
       setAttendanceSummary(data.summary);
     } catch (err) {
       console.error("Error fetching summary:", err);
+      setAttendanceSummary(null);
     }
   };
 
@@ -190,9 +195,11 @@ const TeamLeaderAttendance = () => {
   const fetchTeamSummary = async () => {
     try {
       const { data } = await attendanceAPI.getTeamAttendanceSummary();
+      console.log('📊 Team Attendance Summary:', data);
       setAttendanceSummary(data.summary);
     } catch (err) {
       console.error("Error fetching team summary:", err);
+      setAttendanceSummary(null);
     }
   };
 
@@ -492,12 +499,14 @@ const TeamLeaderAttendance = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Work Hours:</span>
-                <span className="font-medium">{todayAttendance.totalWorkHours?.toFixed(2)}h</span>
+                <span className="font-medium">{todayAttendance.totalWorkHours?.toFixed(2) || '0.00'}h</span>
               </div>
             </div>
           ) : (
             <div className="text-center py-4" style={{ color: themeColors.textSecondary }}>
-              <p>No attendance recorded for today</p>
+              <Clock size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No attendance recorded for today</p>
+              <p className="text-xs mt-1">Punch in to start tracking</p>
             </div>
           )}
         </div>
@@ -553,24 +562,26 @@ const TeamLeaderAttendance = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Present:</span>
-                <span className="font-medium text-green-600">{attendanceSummary.stats.present}</span>
+                <span className="font-medium text-green-600">{attendanceSummary.stats?.present || 0}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Late:</span>
-                <span className="font-medium text-yellow-600">{attendanceSummary.stats.late}</span>
+                <span className="font-medium text-yellow-600">{attendanceSummary.stats?.late || 0}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Absent:</span>
-                <span className="font-medium text-red-600">{attendanceSummary.stats.absent}</span>
+                <span className="font-medium text-red-600">{attendanceSummary.stats?.absent || 0}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Percentage:</span>
-                <span className="font-medium">{attendanceSummary.performance.attendancePercentage}%</span>
+                <span className="font-medium">{attendanceSummary.performance?.attendancePercentage || 0}%</span>
               </div>
             </div>
           ) : (
             <div className="text-center py-4" style={{ color: themeColors.textSecondary }}>
-              <p>Loading summary...</p>
+              <TrendingUp size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Loading summary...</p>
+              <p className="text-xs mt-1">Please wait</p>
             </div>
           )}
         </div>

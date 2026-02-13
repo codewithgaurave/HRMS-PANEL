@@ -35,6 +35,12 @@ const assetAPI = {
       headers: getAuthHeader(),
     }),
 
+  // Get Team Leader Assets
+  getTeamLeaderAssets: () =>
+    axios.get(`${apiRoutes.assets}/team/leader`, {
+      headers: getAuthHeader(),
+    }),
+
   // Get single Asset by ID
   getById: (id) =>
     axios.get(`${apiRoutes.assets}/${id}`, {
@@ -86,6 +92,19 @@ const assetAPI = {
   // Get Asset Categories
   getCategories: () =>
     axios.get(`${apiRoutes.assets}/categories`, {
+      headers: getAuthHeader(),
+    }),
+
+  // Transfer Asset
+  transferAsset: (assetId, toEmployeeId, transferType) =>
+    axios.post(`${apiRoutes.assets}/${assetId}/transfer`, 
+      { toEmployeeId, transferType },
+      { headers: getAuthHeader() }
+    ),
+
+  // Get My Asset History
+  getMyHistory: () =>
+    axios.get(`${apiRoutes.assets}/history/my`, {
       headers: getAuthHeader(),
     }),
 };

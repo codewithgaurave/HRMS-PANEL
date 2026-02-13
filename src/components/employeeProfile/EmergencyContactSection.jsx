@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
-const EmergencyContactSection = ({ employee, onUpdate }) => {
+const EmergencyContactSection = ({ employee, onUpdate, canEdit = false }) => {
   const { themeColors } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -47,16 +47,18 @@ const EmergencyContactSection = ({ employee, onUpdate }) => {
         >
           Emergency Contact
         </h2>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="px-4 py-2 rounded-lg font-medium transition-colors"
-          style={{ 
-            backgroundColor: isEditing ? themeColors.danger : themeColors.primary,
-            color: themeColors.surface
-          }}
-        >
-          {isEditing ? 'Cancel' : 'Edit'}
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="px-4 py-2 rounded-lg font-medium transition-colors"
+            style={{ 
+              backgroundColor: isEditing ? themeColors.danger : themeColors.primary,
+              color: themeColors.surface
+            }}
+          >
+            {isEditing ? 'Cancel' : 'Edit'}
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

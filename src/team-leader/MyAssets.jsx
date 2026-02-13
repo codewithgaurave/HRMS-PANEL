@@ -1,58 +1,58 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
-import { Package, Laptop, Monitor, Smartphone, Headphones } from "lucide-react";
-import assetAPI from "../apis/assetAPI";
 import { useAuth } from "../context/AuthContext";
+import { Package, Laptop, Monitor, Smartphone, Headphones, User } from "lucide-react";
+import assetAPI from "../apis/assetAPI";
+import { toast } from "sonner";
 
 const MyAssets = () => {
   const { themeColors } = useTheme();
   const { user } = useAuth();
-  const [assets, setAssets] = useState([]);
+  const [leaderAssets, setLeaderAssets] = useState([]);
+  const [teamAssets, setTeamAssets] = useState([]);
+  const [activeTab, setActiveTab] = useState('my');
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [stats, setStats] = useState({ totalAssets: 0, teamSize: 0, categories: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchMyAssets();
+    fetchTeamAssets();
   }, []);
 
-  const fetchMyAssets = async () => {
+  const fetchTeamAssets = async () => {
     try {
       setLoading(true);
-      if (user?.id) {
-        const { data } = await assetAPI.getByEmployee(user.id);
-        setAssets(data.assets || []);
-      }
-    } catch (error) {
-      console.error('Error fetching assets:', error);
-      // Use mock data if API fails
-      setAssets([
-        {
-          id: 1,
-          name: "MacBook Pro 16-inch",
-          category: "Laptop",
-          assetId: "LAP001",
-          assignedDate: "2024-01-15",
-          status: "Active",
-          condition: "Good"
-        },
-        {
-          id: 2,
-          name: "Dell UltraSharp Monitor",
-          category: "Monitor",
-          assetId: "MON001",
-          assignedDate: "2024-01-15",
-          status: "Active",
-          condition: "Excellent"
-        },
-        {
-          id: 3,
-          name: "iPhone 14 Pro",
-          category: "Mobile",
-          assetId: "MOB001",
-          assignedDate: "2024-01-10",
-          status: "Active",
-          condition: "Good"
-        }
+      
+      // Fetch both team assets and leader's own assets
+      const [teamResponse, leaderResponse] = await Promise.all([
+        assetAPI.getTeamLeaderAssets().catch(() => ({ data: { assets: [], teamMembers: [], stats: {} } })),
+        user?._id || user?.id ? assetAPI.getByEmployee(user._id || user.id).catch(() => ({ data: { assets: [] } })) : Promise.resolve({ data: { assets: [] } })
       ]);
+      
+      const teamAssetsData = teamResponse.data.assets || [];
+      const leaderAssetsData = leaderResponse.data.assets || [];
+      
+      // Filter leader's active assets
+      const activeLeaderAssets = leaderAssetsData.filter(asset => {
+        if (!asset.assignedTo || !Array.isArray(asset.assignedTo)) return false;
+        return asset.assignedTo.some(assignment => 
+          assignment.isActive && 
+          assignment.employee && 
+          (assignment.employee._id === (user?._id || user?.id) || assignment.employee.id === (user?._id || user?.id))
+        );
+      });
+      
+      setLeaderAssets(activeLeaderAssets);
+      setTeamAssets(teamAssetsData);
+      setTeamMembers(teamResponse.data.teamMembers || []);
+      setStats({
+        totalAssets: activeLeaderAssets.length + teamAssetsData.length,
+        teamSize: teamResponse.data.stats?.teamSize || 0,
+        categories: teamResponse.data.stats?.categories || []
+      });
+    } catch (error) {
+      console.error('Error fetching team assets:', error);
+      toast.error('Failed to fetch assets');
     } finally {
       setLoading(false);
     }
@@ -88,6 +88,8 @@ const MyAssets = () => {
     }
   };
 
+  const assets = activeTab === 'my' ? leaderAssets : teamAssets;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -102,78 +104,129 @@ const MyAssets = () => {
         <div>
           <h1 className="text-2xl font-bold">My Assets</h1>
           <p className="text-sm mt-1" style={{ color: themeColors.textSecondary }}>
-            View assets assigned to you
+            View assets assigned to you and your team
           </p>
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b" style={{ borderColor: themeColors.border }}>
+        <button
+          onClick={() => setActiveTab('my')}
+          className="px-6 py-3 font-medium transition-colors"
+          style={{
+            color: activeTab === 'my' ? themeColors.primary : themeColors.textSecondary,
+            borderBottom: activeTab === 'my' ? `2px solid ${themeColors.primary}` : 'none'
+          }}
+        >
+          My Assets ({leaderAssets.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('team')}
+          className="px-6 py-3 font-medium transition-colors"
+          style={{
+            color: activeTab === 'team' ? themeColors.primary : themeColors.textSecondary,
+            borderBottom: activeTab === 'team' ? `2px solid ${themeColors.primary}` : 'none'
+          }}
+        >
+          Team Assets ({teamAssets.length})
+        </button>
+      </div>
+
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
-          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.primary }}>{assets.length}</div>
+          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.primary }}>{stats.totalAssets}</div>
           <div className="text-sm">Total Assets</div>
         </div>
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
-          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.success }}>{assets.filter(a => a.status === 'Active').length}</div>
-          <div className="text-sm">Active</div>
+          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.success }}>{stats.teamSize}</div>
+          <div className="text-sm">Team Members</div>
         </div>
         <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
-          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.info }}>{assets.filter(a => a.condition === 'Excellent').length}</div>
-          <div className="text-sm">Excellent Condition</div>
-        </div>
-        <div className="p-6 rounded-lg shadow-sm text-center" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
-          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.warning }}>{new Set(assets.map(a => a.category)).size}</div>
+          <div className="text-3xl font-bold mb-2" style={{ color: themeColors.info }}>{stats.categories.length}</div>
           <div className="text-sm">Categories</div>
         </div>
       </div>
 
-      {/* Assets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {assets.map((asset) => (
-          <div key={asset.id} className="p-6 rounded-lg shadow-sm" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="p-3 rounded-full" style={{ backgroundColor: themeColors.primary + '20', color: themeColors.primary }}>
-                {getAssetIcon(asset.category)}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold">{asset.name}</h3>
-                <p className="text-sm" style={{ color: themeColors.textSecondary }}>{asset.assetId}</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Category:</span>
-                <span className="text-sm">{asset.category}</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Assigned Date:</span>
-                <span className="text-sm">{new Date(asset.assignedDate).toLocaleDateString()}</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Status:</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${asset.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {asset.status}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Condition:</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${getConditionColor(asset.condition)}`}>
-                  {asset.condition}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Assets Table */}
+      <div className="rounded-lg shadow-sm overflow-hidden" style={{ backgroundColor: themeColors.surface, border: `1px solid ${themeColors.border}` }}>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead style={{ backgroundColor: themeColors.primary + '10' }}>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Asset</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Brand/Model</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Serial Number</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Assigned To</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Assigned Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Condition</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: themeColors.border }}>
+              {assets.map((asset) => {
+                const assignedEmployee = asset.assignedTo?.[0]?.employee;
+                return (
+                  <tr key={asset._id} className="hover:bg-opacity-50" style={{ backgroundColor: themeColors.surface }}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 rounded-full" style={{ backgroundColor: themeColors.primary + '20', color: themeColors.primary }}>
+                          {getAssetIcon(asset.category)}
+                        </div>
+                        <div>
+                          <div className="font-medium">{asset.name}</div>
+                          <div className="text-sm" style={{ color: themeColors.textSecondary }}>{asset.assetId}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{asset.category}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm">{asset.brand}</div>
+                      <div className="text-xs" style={{ color: themeColors.textSecondary }}>{asset.model}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{asset.serialNumber}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {assignedEmployee ? (
+                        <div className="flex items-center space-x-2">
+                          <User size={16} style={{ color: themeColors.textSecondary }} />
+                          <div>
+                            <div className="text-sm font-medium">{assignedEmployee.name.first} {assignedEmployee.name.last}</div>
+                            <div className="text-xs" style={{ color: themeColors.textSecondary }}>{assignedEmployee.employeeId}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm" style={{ color: themeColors.textSecondary }}>Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {asset.assignedTo?.[0]?.assignedDate ? new Date(asset.assignedTo[0].assignedDate).toLocaleDateString() : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs rounded-full ${asset.status === 'Assigned' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {asset.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs rounded-full ${getConditionColor(asset.condition)}`}>
+                        {asset.condition}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {assets.length === 0 && (
+      {assets.length === 0 && !loading && (
         <div className="text-center py-12">
           <Package size={48} style={{ color: themeColors.textSecondary }} className="mx-auto mb-4" />
-          <p style={{ color: themeColors.textSecondary }}>No assets assigned to you</p>
+          <p style={{ color: themeColors.textSecondary }}>
+            {activeTab === 'my' ? 'No assets assigned to you' : 'No assets assigned to your team'}
+          </p>
         </div>
       )}
     </div>

@@ -254,14 +254,13 @@ const EmployeeAttendance = () => {
     fetchCurrentLocation();
     fetchTodayAttendance();
     fetchSummary();
+    fetchRecords(); // Fetch records on page load
   }, []);
 
   // Fetch records when filters change
   useEffect(() => {
-    if (activeView === "records") {
-      fetchRecords();
-    }
-  }, [filters, activeView]);
+    fetchRecords();
+  }, [filters]);
 
   // Clear messages
   useEffect(() => {

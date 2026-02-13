@@ -11,7 +11,7 @@ const EmploymentDetailsSection = ({
   workShifts,
   managers,
   onUpdate,
-  canEdit = true
+  canEdit = false
 }) => {
   const { themeColors } = useTheme();
   const [isEditing, setIsEditing] = useState(false);

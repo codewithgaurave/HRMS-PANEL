@@ -43,8 +43,30 @@ const Employees = () => {
     designation: "",
     isActive: "",
     page: 1,
-    limit: 10
+    limit: 1000
   });
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Calculate pagination
+  const totalItems = employees.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startIndex = itemsPerPage === 'all' ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === 'all' ? totalItems : startIndex + itemsPerPage;
+  const paginatedEmployees = employees.slice(startIndex, endIndex);
+
+  // Handle items per page change
+  const handleItemsPerPageChange = (value) => {
+    setItemsPerPage(value === 'all' ? 'all' : parseInt(value));
+    setCurrentPage(1);
+  };
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
   // Debounced search to prevent excessive API calls
   const debouncedSearch = useDebounce(filters.search, 500);
@@ -58,13 +80,27 @@ const Employees = () => {
       const queryParams = {};
       if (debouncedSearch) queryParams.search = debouncedSearch;
       if (filters.role) queryParams.role = filters.role;
-      if (filters.designation) queryParams.designation = filters.designation;
+      // Remove designation filter as it causes backend error
+      // if (filters.designation) queryParams.designation = filters.designation;
       if (filters.isActive !== '') queryParams.isActive = filters.isActive;
       if (filters.page) queryParams.page = filters.page;
       if (filters.limit) queryParams.limit = filters.limit;
 
       const { data } = await employeeAPI.getEmployeesAddedByMe(queryParams);
-      setEmployees(data.employees || []);
+      
+      // Apply designation filter on frontend if needed
+      let filteredEmployees = data.employees || [];
+      if (filters.designation) {
+        const designationLower = filters.designation.toLowerCase();
+        filteredEmployees = filteredEmployees.filter(emp => {
+          const empDesignation = typeof emp.designation === 'string' 
+            ? emp.designation 
+            : emp.designation?.title || '';
+          return empDesignation.toLowerCase().includes(designationLower);
+        });
+      }
+      
+      setEmployees(filteredEmployees);
 
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching employees");
@@ -147,7 +183,7 @@ const Employees = () => {
       designation: "",
       isActive: "",
       page: 1,
-      limit: 10
+      limit: 1000
     });
   };
 
@@ -182,7 +218,7 @@ const Employees = () => {
     const initialLoad = async () => {
       try {
         setLoading(true);
-        const { data } = await employeeAPI.getEmployeesAddedByMe({ page: 1, limit: 10 });
+        const { data } = await employeeAPI.getEmployeesAddedByMe({ page: 1, limit: 1000 });
         setEmployees(data.employees || []);
       } catch (err) {
         setError(err.response?.data?.message || err.message || "Error fetching employees");
@@ -360,6 +396,7 @@ const Employees = () => {
             </button>
           </div>
         ) : (
+          <>
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ backgroundColor: themeColors.background }}>
@@ -378,7 +415,7 @@ const Employees = () => {
               </tr>
             </thead>
             <tbody>
-              {employees.map((employee) => (
+              {paginatedEmployees.map((employee) => (
                 <tr key={employee._id} className="border-b" style={{ borderColor: themeColors.border }}>
                   <td className="p-3 text-sm">{employee.employeeId}</td>
                   <td className="p-3 text-sm">{employee.name?.first} {employee.name?.last}</td>
@@ -447,6 +484,65 @@ const Employees = () => {
               ))}
             </tbody>
           </table>
+
+          {/* Pagination Controls */}
+          <div className="flex flex-col md:flex-row justify-between items-center mt-4 gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Show</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(e.target.value)}
+                className="px-3 py-1 rounded-md border text-sm"
+                style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+                <option value="all">All</option>
+              </select>
+              <span className="text-sm">entries</span>
+            </div>
+
+            <div className="text-sm" style={{ color: themeColors.textSecondary }}>
+              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
+            </div>
+
+            {itemsPerPage !== 'all' && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.border,
+                    color: themeColors.text
+                  }}
+                >
+                  Previous
+                </button>
+                
+                <span className="text-sm px-3">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.border,
+                    color: themeColors.text
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+          </>
         )}
       </div>
 

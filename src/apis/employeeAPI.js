@@ -166,6 +166,11 @@ const employeeAPI = {
       headers: getAuthHeader(),
     }),
 
+  updateMyProfile: (section, data) =>
+    axios.patch(`${apiRoutes.employees}/my-profile/${section}`, data, {
+      headers: getAuthHeader(),
+    }),
+
   // ----------------- WITHOUT FILTERS -----------------
   getWithoutFilters: () =>
     axios.get(`${apiRoutes.employees}/without-filters`, {
@@ -175,6 +180,12 @@ const employeeAPI = {
   // ----------------- FORM DATA -----------------
   getFormData: () =>
     axios.get(`${apiRoutes.employees}/form-data`, {
+      headers: getAuthHeader(),
+    }),
+
+  // ----------------- COLLEAGUES -----------------
+  getColleagues: () =>
+    axios.get(`${apiRoutes.employees}/colleagues`, {
       headers: getAuthHeader(),
     }),
 };

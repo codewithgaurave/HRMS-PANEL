@@ -40,6 +40,10 @@ const Attendance = () => {
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [designationFilter, setDesignationFilter] = useState("All");
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const [currentLocation, setCurrentLocation] = useState(null);
 
   // Fetch current location
@@ -323,7 +327,24 @@ const Attendance = () => {
     setStatusFilter("All");
     setDepartmentFilter("All");
     setDesignationFilter("All");
+    setCurrentPage(1);
   };
+
+  // Calculate pagination
+  const totalItems = filteredRecords.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startIndex = itemsPerPage === 'all' ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === 'all' ? totalItems : startIndex + itemsPerPage;
+
+  // Paginated records
+  const paginatedRecords = useMemo(() => {
+    return filteredRecords.slice(startIndex, endIndex);
+  }, [filteredRecords, startIndex, endIndex]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, departmentFilter, designationFilter, activeTab, itemsPerPage]);
 
   // Initialize component
   useEffect(() => {
@@ -352,7 +373,7 @@ const Attendance = () => {
     }
   }, [error, success]);
 
-  const currentAttendance = filteredRecords;
+  const currentAttendance = paginatedRecords;
 
   return (
     <div className="space-y-6 p-4" style={{ color: themeColors.text }}>
@@ -743,7 +764,7 @@ const Attendance = () => {
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: themeColors.primary }}></div>
             </div>
-          ) : currentAttendance.length === 0 ? (
+          ) : filteredRecords.length === 0 ? (
             <div className="text-center py-8" style={{ color: themeColors.textSecondary }}>
               <Clock size={48} className="mx-auto mb-4 opacity-50" />
               {searchTerm ? (
@@ -871,6 +892,68 @@ const Attendance = () => {
                   ))}
                 </tbody>
               </table>
+
+              {/* Pagination Controls */}
+              <div className="flex flex-col md:flex-row justify-between items-center mt-4 gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Show</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setItemsPerPage(value === 'all' ? 'all' : parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-1 rounded-md border text-sm"
+                    style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+                  >
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="30">30</option>
+                    <option value="50">50</option>
+                    <option value="all">All</option>
+                  </select>
+                  <span className="text-sm">entries</span>
+                </div>
+
+                <div className="text-sm" style={{ color: themeColors.textSecondary }}>
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredRecords.length)} of {filteredRecords.length} entries
+                </div>
+
+                {itemsPerPage !== 'all' && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: themeColors.background,
+                        borderColor: themeColors.border,
+                        color: themeColors.text
+                      }}
+                    >
+                      Previous
+                    </button>
+                    
+                    <span className="text-sm px-3">
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: themeColors.background,
+                        borderColor: themeColors.border,
+                        color: themeColors.text
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             /* Grid View */

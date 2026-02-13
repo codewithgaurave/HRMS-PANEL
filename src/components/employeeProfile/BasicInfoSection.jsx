@@ -2,9 +2,13 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
-const BasicInfoSection = ({ employee, onUpdate, canEdit = true }) => {
+const BasicInfoSection = ({ employee, onUpdate, canEdit = false }) => {
   const { themeColors } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Debug log
+  console.log('🔍 BasicInfoSection - canEdit prop:', canEdit);
+  
   const [formData, setFormData] = useState({
     name: {
       first: employee?.name?.first || '',

@@ -40,6 +40,10 @@ const ManageAnnouncements = () => {
     limit: 10,
   });
 
+  // Frontend pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const [formData, setFormData] = useState({
     title: "",
     message: "",
@@ -304,7 +308,15 @@ const ManageAnnouncements = () => {
       page: 1,
       limit: 10,
     });
+    setCurrentPage(1);
   };
+
+  // Frontend pagination calculation
+  const totalItems = announcements.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startIndex = itemsPerPage === 'all' ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === 'all' ? totalItems : startIndex + itemsPerPage;
+  const paginatedAnnouncements = announcements.slice(startIndex, endIndex);
 
   const handleExportAnnouncements = () => {
     const headers = ['Title', 'Category', 'Audience', 'Status', 'Created By', 'Created At', 'Message'];
@@ -558,7 +570,7 @@ const ManageAnnouncements = () => {
                 </tr>
               </thead>
               <tbody>
-                {announcements.map((announcement) => (
+                {paginatedAnnouncements.map((announcement) => (
                   <tr 
                     key={announcement._id} 
                     className="border-b transition-colors hover:opacity-90"
@@ -661,70 +673,67 @@ const ManageAnnouncements = () => {
               </tbody>
             </table>
 
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex justify-between items-center mt-6 pt-4 border-t" style={{ borderColor: themeColors.border }}>
-                <div className="text-sm" style={{ color: themeColors.textSecondary }}>
-                  Page {pagination.currentPage} of {pagination.totalPages}
-                </div>
-                <div className="flex gap-2">
+            {/* Pagination Controls */}
+            <div className="flex flex-col md:flex-row justify-between items-center mt-4 gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Show</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setItemsPerPage(value === 'all' ? 'all' : parseInt(value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1 rounded-md border text-sm"
+                  style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="30">30</option>
+                  <option value="50">50</option>
+                  <option value="all">All</option>
+                </select>
+                <span className="text-sm">entries</span>
+              </div>
+
+              <div className="text-sm" style={{ color: themeColors.textSecondary }}>
+                Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
+              </div>
+
+              {itemsPerPage !== 'all' && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                    disabled={!pagination.hasPrev}
-                    className="p-2 rounded border disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
-                    style={{ 
-                      backgroundColor: themeColors.background, 
-                      borderColor: themeColors.border 
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: themeColors.background,
+                      borderColor: themeColors.border,
+                      color: themeColors.text
                     }}
                   >
-                    ←
+                    Previous
                   </button>
                   
-                  {/* Page numbers */}
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (pagination.currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (pagination.currentPage >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = pagination.currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-1 rounded text-sm transition-colors hover:opacity-90 ${
-                          pagination.currentPage === pageNum ? 'text-white' : ''
-                        }`}
-                        style={{
-                          backgroundColor: pagination.currentPage === pageNum ? themeColors.primary : themeColors.background,
-                          border: `1px solid ${themeColors.border}`,
-                          color: pagination.currentPage === pageNum ? 'white' : themeColors.text
-                        }}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
+                  <span className="text-sm px-3">
+                    Page {currentPage} of {totalPages}
+                  </span>
 
                   <button
-                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                    disabled={!pagination.hasNext}
-                    className="p-2 rounded border disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
-                    style={{ 
-                      backgroundColor: themeColors.background, 
-                      borderColor: themeColors.border 
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded-md border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: themeColors.background,
+                      borderColor: themeColors.border,
+                      color: themeColors.text
                     }}
                   >
-                    →
+                    Next
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>

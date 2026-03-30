@@ -591,144 +591,108 @@ const LeavesManagement = () => {
           </div>
         ) : (
           <>
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '7%' }} />
+              </colgroup>
               <thead>
                 <tr style={{ backgroundColor: themeColors.background }}>
-                  <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
-                    Employee Details
-                  </th>
-                  <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>Leave Type</th>
-                  <th 
-                    className="p-3 text-left border-b text-sm font-medium cursor-pointer"
+                  <th className="px-3 py-2 text-left border-b font-medium" style={{ borderColor: themeColors.border }}>Employee</th>
+                  <th className="px-3 py-2 text-left border-b font-medium" style={{ borderColor: themeColors.border }}>Leave Type</th>
+                  <th
+                    className="px-3 py-2 text-left border-b font-medium cursor-pointer"
                     style={{ borderColor: themeColors.border }}
                     onClick={() => handleSort('startDate')}
                   >
-                    <div className="flex items-center gap-1">
-                      Date Range
-                      <span className="text-xs">{getSortIcon('startDate')}</span>
-                    </div>
+                    <div className="flex items-center gap-1">Date Range <span>{getSortIcon('startDate')}</span></div>
                   </th>
-                  <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>Duration</th>
-                  <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>Reason</th>
-                  <th 
-                    className="p-3 text-left border-b text-sm font-medium cursor-pointer"
+                  <th className="px-3 py-2 text-left border-b font-medium" style={{ borderColor: themeColors.border }}>Duration</th>
+                  <th className="px-3 py-2 text-left border-b font-medium" style={{ borderColor: themeColors.border }}>Reason</th>
+                  <th
+                    className="px-3 py-2 text-left border-b font-medium cursor-pointer"
                     style={{ borderColor: themeColors.border }}
                     onClick={() => handleSort('status')}
                   >
-                    <div className="flex items-center gap-1">
-                      Status
-                      <span className="text-xs">{getSortIcon('status')}</span>
-                    </div>
+                    <div className="flex items-center gap-1">Status <span>{getSortIcon('status')}</span></div>
                   </th>
-                  <th 
-                    className="p-3 text-left border-b text-sm font-medium cursor-pointer"
+                  <th
+                    className="px-3 py-2 text-left border-b font-medium cursor-pointer"
                     style={{ borderColor: themeColors.border }}
                     onClick={() => handleSort('createdAt')}
                   >
-                    <div className="flex items-center gap-1">
-                      Requested On
-                      <span className="text-xs">{getSortIcon('createdAt')}</span>
-                    </div>
+                    <div className="flex items-center gap-1">Requested <span>{getSortIcon('createdAt')}</span></div>
                   </th>
-                  <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>Actions</th>
+                  <th className="px-3 py-2 text-left border-b font-medium" style={{ borderColor: themeColors.border }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {leaves.map((leave) => (
-                  <tr 
-                    key={leave._id} 
+                  <tr
+                    key={leave._id}
                     className="border-b transition-colors hover:opacity-90"
                     style={{ borderColor: themeColors.border }}
                   >
-                    <td className="p-3 text-sm">
-                      <div>
-                        <div className="font-medium">{getEmployeeName(leave.employee)}</div>
-                        <div className="text-xs" style={{ color: themeColors.textSecondary }}>
-                          ID: {leave.employee?.employeeId || 'N/A'}
-                        </div>
-                        <div className="text-xs" style={{ color: themeColors.textSecondary }}>
-                          {leave.employee?.designation || 'N/A'} • {leave.employee?.role || 'N/A'}
-                        </div>
-                      </div>
+                    <td className="px-3 py-2">
+                      <div className="font-medium truncate">{getEmployeeName(leave.employee)}</div>
+                      <div className="text-xs truncate" style={{ color: themeColors.textSecondary }}>ID: {leave.employee?.employeeId || 'N/A'}</div>
+                      <div className="text-xs truncate" style={{ color: themeColors.textSecondary }}>{leave.employee?.designation || 'N/A'}</div>
                     </td>
-                    <td className="p-3">
-                      <span className={getLeaveTypeBadge(leave.leaveType)}>
-                        {leave.leaveType}
-                      </span>
+                    <td className="px-3 py-2">
+                      <span className={getLeaveTypeBadge(leave.leaveType)}>{leave.leaveType}</span>
                     </td>
-                    <td className="p-3 text-sm">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={12} />
-                          {formatDate(leave.startDate)}
-                        </div>
-                        <div className="text-xs text-gray-500">to</div>
-                        <div className="flex items-center gap-1">
-                          <Calendar size={12} />
-                          {formatDate(leave.endDate)}
-                        </div>
-                      </div>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1"><Calendar size={11} />{formatDate(leave.startDate)}</div>
+                      <div className="text-xs" style={{ color: themeColors.textSecondary }}>to</div>
+                      <div className="flex items-center gap-1"><Calendar size={11} />{formatDate(leave.endDate)}</div>
                     </td>
-                    <td className="p-3 text-sm font-medium">
-                      <div className="flex items-center gap-1">
-                        <Clock size={14} />
-                        {calculateDays(leave)} day(s)
-                      </div>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1"><Clock size={13} />{calculateDays(leave)}d</div>
                     </td>
-                    <td className="p-3 text-sm">
-                      <div className="max-w-xs" title={leave.reason}>
-                        {leave.reason || 'No reason provided'}
-                      </div>
+                    <td className="px-3 py-2">
+                      <div className="truncate" title={leave.reason}>{leave.reason || 'No reason provided'}</div>
                     </td>
-                    <td className="p-3">
+                    <td className="px-3 py-2">
+                      <span className={getStatusBadge(leave.status)}>{leave.status}</span>
+                      {getProcessedByName(leave) && (
+                        <div className="text-xs mt-1 truncate" style={{ color: themeColors.textSecondary }}>{getProcessedByName(leave)}</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{formatDate(leave.createdAt)}</td>
+                    <td className="px-3 py-2">
                       <div className="flex flex-col gap-1">
-                        <span className={getStatusBadge(leave.status)}>
-                          {leave.status}
-                        </span>
-                        {getProcessedByName(leave) && (
-                          <div className="text-xs" style={{ color: themeColors.textSecondary }}>
-                            {getProcessedByName(leave)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">{formatDate(leave.createdAt)}</td>
-                    <td className="p-3">
-                      <div className="flex gap-2">
                         {leave.status === "Pending" && (
                           <>
                             <button
                               onClick={() => handleStatusUpdate(leave._id, "Approved")}
-                              className="p-2 rounded text-white transition-colors hover:opacity-90 cursor-pointer flex items-center gap-1"
+                              className="px-2 py-1 rounded text-white text-xs transition-colors hover:opacity-90 cursor-pointer flex items-center gap-1 justify-center"
                               style={{ backgroundColor: themeColors.success }}
                               title="Approve Leave"
                             >
-                              <CheckCircle size={14} />
-                              <span className="text-xs">Approve</span>
+                              <CheckCircle size={12} /> Approve
                             </button>
                             <button
                               onClick={() => handleStatusUpdate(leave._id, "Rejected")}
-                              className="p-2 rounded text-white transition-colors hover:opacity-90 cursor-pointer flex items-center gap-1"
+                              className="px-2 py-1 rounded text-white text-xs transition-colors hover:opacity-90 cursor-pointer flex items-center gap-1 justify-center"
                               style={{ backgroundColor: themeColors.danger }}
                               title="Reject Leave"
                             >
-                              <XCircle size={14} />
-                              <span className="text-xs">Reject</span>
+                              <XCircle size={12} /> Reject
                             </button>
                           </>
                         )}
                         {(leave.status === "Approved" || leave.status === "Rejected") && (
                           <div className="text-xs text-center" style={{ color: themeColors.textSecondary }}>
-                            <div className="font-bold" style={{ color: themeColors.success }}>
-                              Processed
-                            </div>
+                            <div className="font-bold" style={{ color: themeColors.success }}>Processed</div>
                             <div className="mt-1">
-                              {leave.approvedBy && (
-                                <span>By {leave.approvedBy.name?.first}</span>
-                              )}
-                              {leave.rejectedBy && (
-                                <span>By {leave.rejectedBy.name?.first}</span>
-                              )}
+                              {leave.approvedBy && <span>By {leave.approvedBy.name?.first}</span>}
+                              {leave.rejectedBy && <span>By {leave.rejectedBy.name?.first}</span>}
                             </div>
                           </div>
                         )}

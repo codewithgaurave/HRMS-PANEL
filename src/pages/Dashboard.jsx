@@ -872,26 +872,6 @@ const Dashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-4 mt-2 md:mt-0">
-          <button
-            onClick={async () => {
-              try {
-                const debugResponse = await dashboardAPI.debugDashboardData();
-                console.log('🔍 Debug Response:', debugResponse.data);
-                toast.success('Debug data logged to console');
-              } catch (err) {
-                console.error('Debug failed:', err);
-                toast.error('Debug failed');
-              }
-            }}
-            className="px-3 py-1 text-xs rounded border"
-            style={{ 
-              backgroundColor: themeColors.background,
-              borderColor: themeColors.border,
-              color: themeColors.text
-            }}
-          >
-            🔍 Debug
-          </button>
           <div className="text-lg font-medium" style={{ color: themeColors.primary }}>
             {time.toLocaleTimeString('en-US', { 
               hour: '2-digit', 

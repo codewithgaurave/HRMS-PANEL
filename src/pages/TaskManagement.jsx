@@ -24,11 +24,12 @@ const TaskManagement = () => {
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'all', label: 'All Tasks', icon: ListTodo },
+    ...(isManager ? [{ id: 'all', label: 'All Tasks', icon: ListTodo }] : []),
     { id: 'my', label: 'My Tasks', icon: User },
   ];
 
   const handleTaskCreated = () => {
+    setCreateDialogOpen(false);
     setRefreshTrigger(prev => prev + 1);
   };
 

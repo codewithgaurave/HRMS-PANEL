@@ -333,9 +333,14 @@ const MyTasks = ({ refresh }) => {
         sortBy: sortConfig.key,
         sortOrder: sortConfig.direction
       });
-      
-      setTasks(response.data.tasks);
-      setPagination(response.data.pagination);
+
+      setTasks(response.data.tasks || []);
+      const p = response.data.pagination || {};
+      setPagination({
+        page: p.currentPage || p.page || 1,
+        totalPages: p.totalPages || 1,
+        totalTasks: p.totalTasks || 0
+      });
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to fetch tasks';
       setError(errorMessage);

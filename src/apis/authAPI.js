@@ -1,10 +1,8 @@
 // src/apis/authAPI.js 
-import axios from "axios";
-import apiRoutes from "../contants/api";
-
+import api from "./api";
 
 const userAPI = {
-  login: (credentials) => axios.post(`${apiRoutes.employees}/login`, credentials),
+  login: (credentials) => api.post(`/employees/login`, credentials),
 };
 
 export default userAPI;

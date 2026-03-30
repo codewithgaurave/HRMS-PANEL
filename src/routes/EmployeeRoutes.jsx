@@ -15,14 +15,12 @@ const TestAPI = lazy(() => import("../employee/TestAPI"));
 const routes = [
   { path: "/dashboard", component: EmployeeDashboard, name: "Dashboard", icon: "📊" },
   { path: "/attendance", component: EmployeeAttendance, name: "Attendance", icon: "⏰" },
-  // { path: "/my-tasks", component: MyTasks, name: "My Tasks", icon: "📋" },
+  { path: "/my-tasks", component: MyTasks, name: "My Tasks", icon: "📋" },
   { path: "/my-leaves", component: MyLeaves, name: "My Leaves", icon: "📅" },
   { path: "/my-assets", component: MyAssets, name: "My Assets", icon: "💻" },
   { path: "/transfer-history", component: TransferHistory, name: "Transfer History", icon: "🔄" },
-  // { path: "/asset-requests", component: AssetRequests, name: "Asset Requests", icon: "📦" },
   { path: "/my-payroll", component: MyPayroll, name: "My Payroll", icon: "💰" },
   { path: "/notices", component: EmployeeNotices, name: "Notices", icon: "📢" },
-  // { path: "/test-api", component: TestAPI, name: "Test API", icon: "🔧" },
 ];
 
 export default routes;

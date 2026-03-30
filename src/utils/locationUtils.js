@@ -112,7 +112,7 @@ export const clearWatchLocation = (watcherId) => {
 export const googleReverseGeocode = async (latitude, longitude) => {
   try {
     if (!GOOGLE_MAPS_CONFIG.apiKey) {
-      throw new Error('Google Maps API key is not configured');
+      return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
     }
 
     const response = await fetch(
@@ -120,23 +120,18 @@ export const googleReverseGeocode = async (latitude, longitude) => {
     );
     
     if (!response.ok) {
-      throw new Error('Failed to get address from Google Maps API');
+      return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
     }
     
     const data = await response.json();
     
     if (data.status === 'OK' && data.results && data.results.length > 0) {
-      // Return the formatted address from the first result
       return data.results[0].formatted_address;
-    } else if (data.status === 'ZERO_RESULTS') {
-      // No address found for these coordinates
-      return `Location near ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-    } else {
-      throw new Error(`Geocoding failed: ${data.status} - ${data.error_message || 'Unknown error'}`);
     }
+    
+    // Any error status — silently fallback to coordinates
+    return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
   } catch (error) {
-    console.error('Google Maps reverse geocoding failed:', error);
-    // Fallback to coordinates
     return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
   }
 };

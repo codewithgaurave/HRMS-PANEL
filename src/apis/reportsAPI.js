@@ -36,40 +36,26 @@ const reportsAPI = {
     }),
 
   // Asset Reports
-  getAssetReports: () =>
+  getAssetReports: (params = {}) =>
     axios.get(`${apiRoutes.reports}/assets`, {
+      params,
       headers: getAuthHeader(),
     }),
 
-  // Attendance Reports
-  getAttendanceReports: () =>
-    axios.get(`${apiRoutes.reports}/attendance`, {
-      headers: getAuthHeader(),
-    }),
+  getAttendanceReports: (params = {}) =>
+    axios.get(`${apiRoutes.reports}/attendance`, { params, headers: getAuthHeader() }),
 
-  // HR Team Attendance Reports
-  getHRTeamAttendanceReports: () =>
-    axios.get(`${apiRoutes.reports}/team/attendance`, {
-      headers: getAuthHeader(),
-    }),
+  getHRTeamAttendanceReports: (params = {}) =>
+    axios.get(`${apiRoutes.reports}/team/attendance`, { params, headers: getAuthHeader() }),
 
-  // Leave Reports
-  getLeaveReports: () =>
-    axios.get(`${apiRoutes.reports}/leaves`, {
-      headers: getAuthHeader(),
-    }),
+  getLeaveReports: (params = {}) =>
+    axios.get(`${apiRoutes.reports}/leaves`, { params, headers: getAuthHeader() }),
 
-  // HR Team Leave Reports
-  getHRTeamLeaveReports: () =>
-    axios.get(`${apiRoutes.reports}/team/leaves`, {
-      headers: getAuthHeader(),
-    }),
+  getHRTeamLeaveReports: (params = {}) =>
+    axios.get(`${apiRoutes.reports}/team/leaves`, { params, headers: getAuthHeader() }),
 
-  // Department Reports
-  getDepartmentReports: () =>
-    axios.get(`${apiRoutes.reports}/departments`, {
-      headers: getAuthHeader(),
-    }),
+  getDepartmentReports: (params = {}) =>
+    axios.get(`${apiRoutes.reports}/departments`, { params, headers: getAuthHeader() }),
 };
 
 export default reportsAPI;

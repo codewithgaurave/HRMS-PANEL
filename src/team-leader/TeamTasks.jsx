@@ -43,7 +43,7 @@ const TeamTasks = ({ refresh }) => {
     status: '',
     priority: '',
     deadlineStatus: '',
-    isActive: "all",
+    isActive: "true",
     page: 1,
     limit: 10,
   });
@@ -54,28 +54,34 @@ const TeamTasks = ({ refresh }) => {
     totalTasks: 0
   });
 
-  useEffect(() => {
-    fetchTeamTasks();
-  }, [filters, refresh, sortConfig]);
-
   const fetchTeamTasks = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await taskAPI.getAll({
         ...filters,
         sortBy: sortConfig.key,
         sortOrder: sortConfig.direction
       });
-      
-      setTasks(response.data.tasks);
-      setPagination(response.data.pagination);
+
+      setTasks(response.data.tasks || []);
+      const p = response.data.pagination || {};
+      setPagination({
+        page: p.currentPage || p.page || 1,
+        totalPages: p.totalPages || 1,
+        totalTasks: p.totalTasks || 0
+      });
     } catch (error) {
-      setError('Failed to fetch tasks');
+      setError('Failed to fetch tasks: ' + (error.response?.data?.message || error.message));
       console.error('Error fetching tasks:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTeamTasks();
+  }, [filters, refresh, sortConfig]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
@@ -759,7 +765,6 @@ const TeamTasks = ({ refresh }) => {
                 color: themeColors.text
               }}
             >
-              <option value="all">All Tasks</option>
               <option value="true">Active Tasks</option>
               <option value="false">Deleted Tasks</option>
             </select>

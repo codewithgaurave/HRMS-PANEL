@@ -492,7 +492,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
                 >
                   <option value="Employee">Employee</option>
                   <option value="Team_Leader">Team Leader</option>
-                  <option value="HR_Manager">HR Manager</option>
+                  {/* <option value="HR_Manager">HR Manager</option> */}
                 </select>
               </div>
 

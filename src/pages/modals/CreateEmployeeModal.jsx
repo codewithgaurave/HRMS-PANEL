@@ -43,7 +43,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
     },
     
     // Employment Details
-    role: "Employee",
+    role: "",
     manager: "",
     department: "",
     designation: "",
@@ -170,7 +170,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
           country: "India",
           pincode: ""
         },
-        role: "Employee",
+        role: "",
         manager: "",
         department: "",
         designation: "",
@@ -490,6 +490,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onEmployeeCreated }) => {
                     color: themeColors.text
                   }}
                 >
+                  <option value="">Select Role</option>
                   <option value="Employee">Employee</option>
                   <option value="Team_Leader">Team Leader</option>
                   {/* <option value="HR_Manager">HR Manager</option> */}

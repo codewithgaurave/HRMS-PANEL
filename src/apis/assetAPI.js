@@ -102,6 +102,24 @@ const assetAPI = {
       { headers: getAuthHeader() }
     ),
 
+  // Get Incoming Pending Transfers
+  getIncomingTransfers: () =>
+    axios.get(`${apiRoutes.assets}/pending/incoming`, {
+      headers: getAuthHeader(),
+    }),
+
+  // Accept Asset Transfer
+  acceptTransfer: (id) =>
+    axios.post(`${apiRoutes.assets}/${id}/accept-transfer`, {}, {
+      headers: getAuthHeader(),
+    }),
+
+  // Reject Asset Transfer
+  rejectTransfer: (id) =>
+    axios.post(`${apiRoutes.assets}/${id}/reject-transfer`, {}, {
+      headers: getAuthHeader(),
+    }),
+
   // Get My Asset History
   getMyHistory: () =>
     axios.get(`${apiRoutes.assets}/history/my`, {

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import assetAPI from "../apis/assetAPI";
 import employeeAPI from "../apis/employeeAPI";
+import assetCategoryAPI from "../apis/assetCategoryAPI";
 import { 
   Plus, Edit, Trash2, Package, User, Calendar, 
   Filter, Download, Eye, UserPlus, RotateCcw 
@@ -48,13 +49,14 @@ const AssetManagement = () => {
     location: ""
   });
 
-  const categories = ['Laptop', 'Desktop', 'Mobile', 'Tablet', 'T-Shirt', 'Uniform', 'ID Card', 'Access Card', 'Headphones', 'Monitor', 'Keyboard', 'Mouse', 'Charger', 'Other'];
+  const [categories, setCategories] = useState([]);
   const conditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
   const statuses = ['Available', 'Assigned', 'Under Maintenance', 'Retired'];
 
   useEffect(() => {
     fetchAssets();
     fetchEmployees();
+    fetchCategories();
   }, [filters]);
 
   const fetchAssets = async () => {
@@ -75,6 +77,15 @@ const AssetManagement = () => {
       setEmployees(data.employees || []);
     } catch (err) {
       console.error("Error fetching employees:", err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const { data } = await assetCategoryAPI.getAll({ limit: 100, status: "Active" });
+      setCategories(data.categories || []);
+    } catch (err) {
+      console.error("Error fetching categories:", err);
     }
   };
 
@@ -440,7 +451,7 @@ const AssetManagement = () => {
                   >
                     <option value="">Select Category</option>
                     {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
                     ))}
                   </select>
                 </div>

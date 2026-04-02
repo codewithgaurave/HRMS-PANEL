@@ -10,7 +10,8 @@ import {
   Settings as SettingsIcon,
   ChevronRight,
   LocateIcon,
-  BookCheck
+  BookCheck,
+  Tag
 } from "lucide-react";
 import Departments from "./Departments";
 import Designations from "./Designations";
@@ -18,6 +19,7 @@ import WorkShifts from "./WorkShifts";
 import EmploymentStatuses from "./EmploymentStatuses";
 import OfficeLocations from "./OfficeLocations";
 import LeavePolicies from "./LeavePolicies";
+import AssetCategories from "./AssetCategories";
 
 const Settings = () => {
   const { themeColors } = useTheme();
@@ -66,6 +68,13 @@ const Settings = () => {
       icon: BookCheck,
       component: LeavePolicies,
       description: "Manage leave policies"
+    },
+    {
+      id: "assetcategories",
+      name: "Asset Categories",
+      icon: Tag,
+      component: AssetCategories,
+      description: "Manage asset categories"
     },
   ];
 

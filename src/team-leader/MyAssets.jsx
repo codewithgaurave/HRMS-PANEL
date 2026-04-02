@@ -14,10 +14,18 @@ const MyAssets = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [stats, setStats] = useState({ totalAssets: 0, teamSize: 0, categories: [] });
   const [loading, setLoading] = useState(true);
+  const [incomingTransfers, setIncomingTransfers] = useState([]);
+  const [processingId, setProcessingId] = useState(null);
 
   useEffect(() => {
-    fetchTeamAssets();
-  }, []);
+    fetchAllData();
+  }, [user]);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    await Promise.all([fetchTeamAssets(), fetchIncomingTransfers()]);
+    setLoading(false);
+  };
 
   const fetchTeamAssets = async () => {
     try {
@@ -53,8 +61,41 @@ const MyAssets = () => {
     } catch (error) {
       console.error('Error fetching team assets:', error);
       toast.error('Failed to fetch assets');
+    }
+  };
+
+  const fetchIncomingTransfers = async () => {
+    try {
+      const response = await assetAPI.getIncomingTransfers();
+      setIncomingTransfers(response.data.assets || []);
+    } catch (error) {
+      console.error('Error fetching incoming transfers:', error);
+    }
+  };
+
+  const handleAcceptTransfer = async (assetId) => {
+    try {
+      setProcessingId(assetId);
+      await assetAPI.acceptTransfer(assetId);
+      toast.success('Asset transfer accepted successfully');
+      await fetchAllData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to accept transfer');
     } finally {
-      setLoading(false);
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectTransfer = async (assetId) => {
+    try {
+      setProcessingId(assetId);
+      await assetAPI.rejectTransfer(assetId);
+      toast.success('Asset transfer rejected');
+      await fetchAllData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to reject transfer');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -108,6 +149,69 @@ const MyAssets = () => {
           </p>
         </div>
       </div>
+
+      {/* Incoming Transfers Section */}
+      {incomingTransfers.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-orange-500 p-2 rounded-lg text-white">
+               <Package size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-orange-900">Incoming Transfer Requests</h2>
+              <p className="text-sm text-orange-700">These assets have been transferred to you. Please accept or reject them.</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {incomingTransfers.map((asset) => (
+              <div key={asset._id} className="bg-white border border-orange-100 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-bold text-gray-900">{asset.name}</h3>
+                    <p className="text-xs text-gray-500">{asset.assetId} | {asset.category}</p>
+                  </div>
+                  <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                    Pending
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5 mb-4 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">From:</span>
+                    <span className="font-medium text-gray-800">
+                      {asset.pendingTransfer?.fromEmployee?.name?.first} {asset.pendingTransfer?.fromEmployee?.name?.last}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Type:</span>
+                    <span className="font-medium text-blue-600 uppercase">{asset.pendingTransfer?.transferType}</span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAcceptTransfer(asset._id)}
+                    disabled={processingId === asset._id}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded-md transition-colors flex items-center justify-center gap-1"
+                  >
+                    {processingId === asset._id ? (
+                       <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div>
+                    ) : 'Accept'}
+                  </button>
+                  <button
+                    onClick={() => handleRejectTransfer(asset._id)}
+                    disabled={processingId === asset._id}
+                    className="flex-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold py-2 rounded-md transition-colors"
+                  >
+                    {processingId === asset._id ? '...' : 'Reject'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b" style={{ borderColor: themeColors.border }}>

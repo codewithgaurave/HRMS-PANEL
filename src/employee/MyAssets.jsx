@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { assetAPI } from '../apis/assetAPI';
 import employeeAPI from '../apis/employeeAPI';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { toast } from 'sonner';
-import { X, Send, History } from 'lucide-react';
+import { X, Send, History, Check, RefreshCw } from 'lucide-react';
 
 const MyAssets = () => {
   const [assets, setAssets] = useState([]);
+  const [incomingTransfers, setIncomingTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
@@ -16,38 +16,75 @@ const MyAssets = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [transferring, setTransferring] = useState(false);
+  const [processingId, setProcessingId] = useState(null);
   
   const { user } = useAuth();
-  const { themeColors } = useTheme();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && (user._id || user.id)) {
-      fetchMyAssets();
-    } else {
-      setLoading(false);
-    }
+    const loadAll = async () => {
+      if (user && (user._id || user.id)) {
+        setLoading(true);
+        await Promise.all([fetchMyAssets(), fetchIncomingTransfers()]);
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
+    };
+    loadAll();
   }, [user]);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    await Promise.all([fetchMyAssets(), fetchIncomingTransfers()]);
+    setLoading(false);
+  };
+
+  const fetchIncomingTransfers = async () => {
+    try {
+      const response = await assetAPI.getIncomingTransfers();
+      setIncomingTransfers(response.data.assets || []);
+    } catch (error) {
+      console.error('Fetch incoming transfers error:', error);
+    }
+  };
+
+  const handleAcceptTransfer = async (assetId) => {
+    try {
+      setProcessingId(assetId);
+      await assetAPI.acceptTransfer(assetId);
+      toast.success('Asset transfer accepted');
+      fetchAllData();
+    } catch (error) {
+      console.error('Accept error:', error);
+      toast.error(error.response?.data?.message || 'Failed to accept transfer');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectTransfer = async (assetId) => {
+    if (!window.confirm('Are you sure you want to reject this transfer?')) return;
+    try {
+      setProcessingId(assetId);
+      await assetAPI.rejectTransfer(assetId);
+      toast.success('Asset transfer rejected');
+      fetchIncomingTransfers();
+    } catch (error) {
+      console.error('Reject error:', error);
+      toast.error(error.response?.data?.message || 'Failed to reject transfer');
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   const fetchMyAssets = async () => {
     try {
-      setLoading(true);
-      if (!user || (!user._id && !user.id)) {
-        setLoading(false);
-        return;
-      }
-
+      if (!user || (!user._id && !user.id)) return;
       const userId = user._id || user.id;
-      console.log('🔍 Fetching assets for User ID:', userId);
-      
       const response = await assetAPI.getByEmployee(userId);
-      console.log('📦 API Response:', response.data);
-      
       if (response && response.data) {
         const allAssets = response.data.assets || [];
-        console.log('📋 Total Assets from API:', allAssets.length);
-        console.log('📋 All Assets:', allAssets);
-        
         const activeAssets = allAssets.filter(asset => {
           if (!asset.assignedTo || !Array.isArray(asset.assignedTo)) return false;
           return asset.assignedTo.some(assignment => 
@@ -56,37 +93,22 @@ const MyAssets = () => {
             (assignment.employee._id === userId || assignment.employee.id === userId)
           );
         });
-        
-        console.log('✅ Active Assets Assigned to You:', activeAssets.length);
-        console.log('✅ Active Assets Details:', activeAssets);
         setAssets(activeAssets);
-      } else {
-        console.log('❌ No data in response');
-        setAssets([]);
       }
     } catch (error) {
-      console.error('❌ Fetch assets error:', error);
+      console.error('Fetch assets error:', error);
       toast.error('Failed to fetch assets');
-      setAssets([]);
-    } finally {
-      setLoading(false);
     }
   };
-
+// ... rest of the component
   const fetchEmployees = async () => {
     try {
       setLoadingEmployees(true);
-      
       const response = await employeeAPI.getColleagues();
-      
-      console.log('🔍 Colleagues Response:', response.data);
-      
       const colleagues = response.data?.colleagues || [];
-      
-      console.log('✅ Total Colleagues:', colleagues.length);
       setEmployees(colleagues);
     } catch (error) {
-      console.error('❌ Error fetching colleagues:', error);
+      console.error('Error fetching colleagues:', error);
       toast.error('Failed to fetch colleagues');
     } finally {
       setLoadingEmployees(false);
@@ -109,9 +131,9 @@ const MyAssets = () => {
     try {
       setTransferring(true);
       await assetAPI.transferAsset(selectedAsset._id, selectedEmployee, 'transfer');
-      toast.success('Asset transferred successfully');
+      toast.success('Transfer request sent successfully');
       setShowTransferModal(false);
-      fetchMyAssets();
+      fetchAllData();
     } catch (error) {
       console.error('Transfer error:', error);
       toast.error(error.response?.data?.message || 'Failed to transfer asset');
@@ -124,7 +146,10 @@ const MyAssets = () => {
     return (
       <div className="p-6">
         <div className="text-center">
-          <div className="text-lg">Loading assets...</div>
+          <div className="text-lg flex flex-col items-center gap-2">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+             Loading assets...
+          </div>
         </div>
       </div>
     );
@@ -134,90 +159,117 @@ const MyAssets = () => {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">My Assets</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/transfer-history')}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-md transition"
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-sm transition"
           >
             <History size={18} />
             Transfer History
           </button>
-          <div className="text-sm text-gray-600 font-medium">
-            Total Assets: {assets.length}
-          </div>
+          <button onClick={fetchAllData} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
+             <RefreshCw size={18} />
+          </button>
         </div>
       </div>
 
+      {/* Incoming Transfers Section */}
+      {incomingTransfers.length > 0 && (
+        <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">💼</span>
+            <h2 className="text-lg font-bold text-orange-800">Incoming Transfer Requests ({incomingTransfers.length})</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {incomingTransfers.map((req) => (
+              <div key={req._id} className="bg-white rounded-lg border border-orange-200 p-4 shadow-sm hover:shadow-md transition">
+                <div className="font-bold text-gray-800 mb-1">{req.name}</div>
+                <div className="text-xs text-gray-500 mb-3">{req.assetId} • {req.category}</div>
+                <div className="text-sm bg-gray-50 p-2 rounded mb-4 border border-gray-100">
+                  <span className="text-gray-600">From: </span>
+                  <span className="font-semibold">{req.pendingTransfer?.fromEmployee?.name?.first} {req.pendingTransfer?.fromEmployee?.name?.last}</span>
+                  <div className="text-[10px] text-gray-400 mt-0.5">Type: {req.pendingTransfer?.transferType}</div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={processingId === req._id}
+                    onClick={() => handleAcceptTransfer(req._id)}
+                    className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    {processingId === req._id ? <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div> : <Check size={16} />}
+                    Accept
+                  </button>
+                  <button
+                    disabled={processingId === req._id}
+                    onClick={() => handleRejectTransfer(req._id)}
+                    className="flex-1 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    {processingId === req._id ? <div className="animate-spin h-3 w-3 border-2 border-red-600 border-t-transparent rounded-full"></div> : <X size={16} />}
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {assets.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
+        <div className="bg-white rounded-lg shadow p-12 text-center border">
           <div className="text-gray-400 text-6xl mb-4">💻</div>
           <h3 className="text-lg font-semibold text-gray-600 mb-2">No Assets Assigned</h3>
-          <p className="text-gray-500">You don't have any assets assigned to you yet.</p>
-          <button 
-            onClick={fetchMyAssets}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Refresh
-          </button>
+          <p className="text-gray-500 max-w-xs mx-auto">You don't have any active assets assigned to you at the moment.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {assets.map((asset) => (
-            <div key={asset._id} className="bg-white rounded-lg shadow border hover:shadow-lg transition-shadow">
+            <div key={asset._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative hover:shadow-lg transition-shadow">
+              {asset.pendingTransfer && 
+               (asset.pendingTransfer.fromEmployee?._id === (user._id || user.id) || 
+                asset.pendingTransfer.fromEmployee === (user._id || user.id)) && (
+                <div className="absolute top-2 right-2 bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 z-10 flex items-center gap-1">
+                   <div className="animate-pulse w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
+                   Transfer Pending
+                </div>
+              )}
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">{asset.name}</h3>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    asset.status === 'Assigned' ? 'bg-green-100 text-green-800' :
-                    asset.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                    asset.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {asset.status}
-                  </span>
+                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1">{asset.name}</h3>
                 </div>
                 
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Asset ID:</span>
-                    <span className="font-medium">{asset.assetId}</span>
+                  <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                    <span className="text-gray-500">Asset ID</span>
+                    <span className="font-mono font-medium text-gray-700 bg-gray-50 px-2 py-0.5 rounded">{asset.assetId}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Category:</span>
-                    <span>{asset.category}</span>
+                  <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                    <span className="text-gray-500">Category</span>
+                    <span className="font-medium text-gray-700">{asset.category}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Serial Number:</span>
-                    <span>{asset.serialNumber || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Assigned Date:</span>
-                    <span>{asset.assignedTo?.[0]?.assignedDate ? new Date(asset.assignedTo[0].assignedDate).toLocaleDateString() : 'N/A'}</span>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-gray-500">Condition</span>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                      asset.condition === 'New' || asset.condition === 'Excellent' ? 'bg-green-100 text-green-700' :
+                      asset.condition === 'Good' ? 'bg-blue-100 text-blue-700' :
+                      asset.condition === 'Fair' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {asset.condition}
+                    </span>
                   </div>
                 </div>
 
-                {asset.condition && (
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Condition:</span>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        asset.condition === 'Excellent' ? 'bg-green-100 text-green-800' :
-                        asset.condition === 'Good' ? 'bg-blue-100 text-blue-800' :
-                        asset.condition === 'Fair' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {asset.condition}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
                 <button
                   onClick={() => handleTransferClick(asset)}
-                  className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                  disabled={asset.pendingTransfer && (asset.pendingTransfer.fromEmployee?._id === (user._id || user.id) || asset.pendingTransfer.fromEmployee === (user._id || user.id))}
+                  className={`w-full mt-5 px-4 py-2.5 rounded-lg border-2 transition-all flex items-center justify-center gap-2 font-bold text-sm ${
+                    (asset.pendingTransfer && (asset.pendingTransfer.fromEmployee?._id === (user._id || user.id) || asset.pendingTransfer.fromEmployee === (user._id || user.id)))
+                    ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
+                    : 'bg-white text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white'
+                  }`}
                 >
                   <Send size={16} />
-                  Transfer Asset
+                  {(asset.pendingTransfer && (asset.pendingTransfer.fromEmployee?._id === (user._id || user.id) || asset.pendingTransfer.fromEmployee === (user._id || user.id))) ? 'Transfer Requested' : 'Transfer Asset'}
                 </button>
               </div>
             </div>

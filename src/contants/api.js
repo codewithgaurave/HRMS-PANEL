@@ -20,7 +20,8 @@ const apiRoutes = {
   assetRequests: `${BASE_URL}/${API_PREFIX}/asset-requests`,
   notices: `${BASE_URL}/${API_PREFIX}/notices`,
   payroll: `${BASE_URL}/${API_PREFIX}/payroll`,
-  reports: `${BASE_URL}/${API_PREFIX}/reports`
+  reports: `${BASE_URL}/${API_PREFIX}/reports`,
+  assetCategories: `${BASE_URL}/${API_PREFIX}/asset-categories`
 };
 
 export default apiRoutes;

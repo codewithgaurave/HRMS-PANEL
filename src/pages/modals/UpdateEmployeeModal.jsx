@@ -44,7 +44,8 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
     workShift: "",
     salary: "",
     dateOfJoining: "",
-    allowedPunchInRange: 500
+    allowedPunchInRange: 500,
+    isFieldEmployee: false
   });
 
   // Fetch all reference data
@@ -112,7 +113,8 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
         workShift: employee.workShift?._id || "",
         salary: employee.salary || "",
         dateOfJoining: employee.dateOfJoining ? new Date(employee.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        allowedPunchInRange: employee.allowedPunchInRange || 500
+        allowedPunchInRange: employee.allowedPunchInRange || 500,
+        isFieldEmployee: employee.isFieldEmployee || false
       });
     }
   }, [employee, isOpen]);
@@ -160,6 +162,7 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
         ...formData,
         salary: Number(formData.salary),
         allowedPunchInRange: Number(formData.allowedPunchInRange) || 500,
+        isFieldEmployee: formData.isFieldEmployee,
         // Convert empty strings to undefined for optional fields
         gender: formData.gender || undefined,
         dob: formData.dob || undefined,
@@ -663,12 +666,29 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
                 />
               </div>
 
+              {/* Field Employee Toggle */}
+              <div className="p-3 rounded-lg border" style={{ borderColor: themeColors.border, backgroundColor: themeColors.background }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium" style={{ color: themeColors.text }}>Field Employee</label>
+                    <p className="text-xs mt-0.5" style={{ color: themeColors.textSecondary }}>Can punch-in from anywhere (no location restriction)</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, isFieldEmployee: !prev.isFieldEmployee }))}
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                    style={{ backgroundColor: formData.isFieldEmployee ? themeColors.primary : themeColors.border }}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isFieldEmployee ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {!formData.isFieldEmployee && (
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Punch-In Range (meters)
-                  <span className="text-xs ml-2" style={{ color: themeColors.textSecondary }}>
-                    (10m - 10,000m)
-                  </span>
+                  <span className="text-xs ml-2" style={{ color: themeColors.textSecondary }}>(10m - 10,000m)</span>
                 </label>
                 <input
                   type="number"
@@ -679,16 +699,11 @@ const UpdateEmployeeModal = ({ isOpen, onClose, employee, onEmployeeUpdated }) =
                   max="10000"
                   placeholder="500"
                   className="w-full p-2 rounded-md border text-sm"
-                  style={{
-                    backgroundColor: themeColors.background,
-                    borderColor: themeColors.border,
-                    color: themeColors.text
-                  }}
+                  style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
                 />
-                <p className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
-                  Default: 500m. Employee can punch-in within this range from office.
-                </p>
+                <p className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>Default: 500m. Employee can punch-in within this range from office.</p>
               </div>
+              )}
             </div>
           </div>
 

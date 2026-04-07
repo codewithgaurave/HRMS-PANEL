@@ -1183,7 +1183,7 @@ const Dashboard = () => {
         />
         <QuickStatCard
           title="Overtime Hours"
-          value={`${safeStats.performance.overtimeStats.totalOvertime}h`}
+          value={`${parseFloat(safeStats.performance.overtimeStats.totalOvertime || 0).toFixed(2)}h`}
           icon={<BarChart3 size={20} />}
           color={themeColors.warning}
         />

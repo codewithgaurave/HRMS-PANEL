@@ -1,26 +1,29 @@
 // src/components/tasks/CreateTask.js
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import taskAPI from '../../apis/taskAPI';
+import taskAPI, { taskTypeAPI } from '../../apis/taskAPI';
 import { 
   X, 
   Calendar as CalendarIcon,
   User,
   AlertCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Tag
 } from 'lucide-react';
 
 const CreateTask = ({ open, onClose, onTaskCreated }) => {
   const { themeColors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [taskTypes, setTaskTypes] = useState([]);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     assignedTo: '',
     priority: 'Medium',
+    taskType: '',
     dueDate: '',
     deadline: ''
   });
@@ -28,6 +31,7 @@ const CreateTask = ({ open, onClose, onTaskCreated }) => {
   useEffect(() => {
     if (open) {
       fetchAssignableEmployees();
+      fetchTaskTypes();
       // Set default deadline to tomorrow
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -44,6 +48,15 @@ const CreateTask = ({ open, onClose, onTaskCreated }) => {
       setEmployees(response.data.employees);
     } catch (error) {
       console.error('Error fetching employees:', error);
+    }
+  };
+
+  const fetchTaskTypes = async () => {
+    try {
+      const response = await taskTypeAPI.getAll();
+      setTaskTypes(response.data.taskTypes || []);
+    } catch (error) {
+      console.error('Error fetching task types:', error);
     }
   };
 
@@ -89,6 +102,7 @@ const CreateTask = ({ open, onClose, onTaskCreated }) => {
     try {
       await taskAPI.create({
         ...formData,
+        taskType: formData.taskType || null,
         dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
         deadline: new Date(formData.deadline)
       });
@@ -99,6 +113,7 @@ const CreateTask = ({ open, onClose, onTaskCreated }) => {
         description: '',
         assignedTo: '',
         priority: 'Medium',
+        taskType: '',
         dueDate: '',
         deadline: ''
       });
@@ -249,6 +264,36 @@ const CreateTask = ({ open, onClose, onTaskCreated }) => {
                 <option value="Urgent">Urgent</option>
               </select>
             </div>
+          </div>
+
+          {/* Task Type */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: themeColors.text }}>
+              Task Type
+            </label>
+            <div className="relative">
+              <Tag
+                size={16}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+                style={{ color: themeColors.textSecondary }}
+              />
+              <select
+                value={formData.taskType}
+                onChange={handleChange('taskType')}
+                className="w-full pl-10 pr-4 py-3 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+              >
+                <option value="">Select Task Type (Optional)</option>
+                {taskTypes.map(type => (
+                  <option key={type._id} value={type._id}>{type.name}</option>
+                ))}
+              </select>
+            </div>
+            {taskTypes.length === 0 && (
+              <p className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
+                No task types found. Add them from the Task Types tab.
+              </p>
+            )}
           </div>
 
           {/* Due Date (Optional) */}

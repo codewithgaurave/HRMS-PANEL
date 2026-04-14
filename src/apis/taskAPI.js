@@ -15,4 +15,11 @@ const taskAPI = {
   getDeadlineAlerts: () => api.get('/tasks/alerts/deadline'),
 };
 
+export const taskTypeAPI = {
+  getAll: () => api.get('/task-types'),
+  create: (data) => api.post('/task-types', data),
+  update: (id, data) => api.put(`/task-types/${id}`, data),
+  delete: (id) => api.delete(`/task-types/${id}`),
+};
+
 export default taskAPI;

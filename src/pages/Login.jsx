@@ -89,6 +89,11 @@ const Login = () => {
                 }}
             >
                 <div className="text-center mb-8">
+                    <img 
+                        src="/hrms_logo.png" 
+                        alt="HRMS Logo" 
+                        className="h-32 w-auto mx-auto mb-4"
+                    />
                     <h1
                         className="text-3xl font-bold mb-2"
                         style={{ color: themeColors.primary }}

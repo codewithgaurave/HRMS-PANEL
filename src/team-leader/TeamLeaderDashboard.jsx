@@ -169,18 +169,25 @@ const TeamLeaderDashboard = () => {
     <div className="space-y-6 p-4">
       {/* Header with Date/Time */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: themeColors.text }}>
-            Team Leader Dashboard
-          </h1>
-          <p className="text-sm mt-1" style={{ color: themeColors.text }}>
-            Team Overview - {time.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
+        <div className="flex items-center gap-4">
+          <img 
+            src="/hrms_logo.png" 
+            alt="HRMS Logo" 
+            className="h-12 w-auto"
+          />
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: themeColors.text }}>
+              Team Leader Dashboard
+            </h1>
+            <p className="text-sm mt-1" style={{ color: themeColors.text }}>
+              Team Overview - {time.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+          </div>
         </div>
         <div className="text-lg font-medium mt-2 md:mt-0" style={{ color: themeColors.primary }}>
           {time.toLocaleTimeString('en-US', { 

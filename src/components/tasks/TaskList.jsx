@@ -271,6 +271,14 @@ const TaskList = ({ isManager = false, refresh }) => {
                 <StatusBadge status={task.status} />
                 <PriorityBadge priority={task.priority} />
                 <DeadlineBadge task={task} />
+                {task.taskType && (
+                  <span
+                    className="px-2 py-1 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: themeColors.primary + '15', color: themeColors.primary }}
+                  >
+                    {task.taskType?.name || task.taskType}
+                  </span>
+                )}
               </div>
 
               <p className="text-sm opacity-80 mb-4 line-clamp-3 flex-1">
@@ -527,6 +535,9 @@ const TaskList = ({ isManager = false, refresh }) => {
               Assigned To
             </th>
             <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
+              Task Type
+            </th>
+            <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
               Status
             </th>
             <th className="p-3 text-left border-b text-sm font-medium" style={{ borderColor: themeColors.border }}>
@@ -596,6 +607,18 @@ const TaskList = ({ isManager = false, refresh }) => {
                       }
                     </span>
                   </div>
+                </td>
+                <td className="p-3 text-sm">
+                  {task.taskType ? (
+                    <span
+                      className="px-2 py-1 rounded-full text-xs font-medium"
+                      style={{ backgroundColor: themeColors.primary + '15', color: themeColors.primary }}
+                    >
+                      {task.taskType?.name || task.taskType}
+                    </span>
+                  ) : (
+                    <span style={{ color: themeColors.textSecondary }}>—</span>
+                  )}
                 </td>
                 <td className="p-3 text-sm">
                   <span className={`px-2 py-1 rounded-full text-xs ${

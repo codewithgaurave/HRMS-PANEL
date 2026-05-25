@@ -1152,8 +1152,8 @@ const Reports = () => {
 
     </div>
 
-      {/* Employee Attendance Detail Modal */}
-      {empDetailModal && selectedEmp && (
+    {/* Employee Attendance Detail Modal */}
+    {empDetailModal && selectedEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl" style={{ backgroundColor: themeColors.surface }}>
             {/* Modal Header */}
@@ -1226,7 +1226,6 @@ const Reports = () => {
           </div>
         </div>
       )}
-    </div>
     </>
   );
 };

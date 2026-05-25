@@ -39,6 +39,8 @@ const Attendance = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [designationFilter, setDesignationFilter] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -139,7 +141,11 @@ const Attendance = () => {
   const fetchMyAttendance = async () => {
     try {
       setLoading(true);
-      const { data } = await attendanceAPI.getMyAttendance();
+      const { data } = await attendanceAPI.getMyAttendance({
+        startDate: startDate || "",
+        endDate: endDate || "",
+        limit: 500,
+      });
       setMyAttendance(data.attendances || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching attendance records");
@@ -152,7 +158,11 @@ const Attendance = () => {
   const fetchAllAttendance = async () => {
     try {
       setLoading(true);
-      const { data } = await attendanceAPI.getAttendance();
+      const { data } = await attendanceAPI.getAttendance({
+        startDate: startDate || "",
+        endDate: endDate || "",
+        limit: 500,
+      });
       setAllAttendance(data.attendance || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error fetching all attendance");
@@ -304,6 +314,14 @@ const Attendance = () => {
       if (statusFilter !== "All" && record.status !== statusFilter) {
         return false;
       }
+
+      // Date range filter (frontend side for already loaded data)
+      if (startDate && record.date) {
+        if (new Date(record.date) < new Date(startDate)) return false;
+      }
+      if (endDate && record.date) {
+        if (new Date(record.date) > new Date(endDate + 'T23:59:59')) return false;
+      }
       
       // Department filter (only for all attendance)
       if (activeTab === "allAttendance" && departmentFilter !== "All" && 
@@ -319,7 +337,7 @@ const Attendance = () => {
       
       return true;
     });
-  }, [myAttendance, allAttendance, activeTab, searchTerm, statusFilter, departmentFilter, designationFilter]);
+  }, [myAttendance, allAttendance, activeTab, searchTerm, statusFilter, departmentFilter, designationFilter, startDate, endDate]);
 
   // Clear filters
   const clearFilters = () => {
@@ -327,6 +345,8 @@ const Attendance = () => {
     setStatusFilter("All");
     setDepartmentFilter("All");
     setDesignationFilter("All");
+    setStartDate("");
+    setEndDate("");
     setCurrentPage(1);
   };
 
@@ -345,6 +365,12 @@ const Attendance = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, departmentFilter, designationFilter, activeTab, itemsPerPage]);
+
+  // Refetch when date range changes
+  useEffect(() => {
+    if (activeTab === "myAttendance") fetchMyAttendance();
+    else if (activeTab === "allAttendance") fetchAllAttendance();
+  }, [startDate, endDate]);
 
   // Initialize component
   useEffect(() => {
@@ -677,6 +703,28 @@ const Attendance = () => {
                 </div>
               </div>
             )}
+
+            {/* Date Range */}
+            <div>
+              <label className="block text-sm font-medium mb-2">From Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full p-2 rounded-md border text-sm"
+                style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">To Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full p-2 rounded-md border text-sm"
+                style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
+              />
+            </div>
 
             {/* Status Filter */}
             <div>

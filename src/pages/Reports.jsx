@@ -56,6 +56,12 @@ const Reports = () => {
   const [leaveMonth, setLeaveMonth] = useState('');
   const [deptYear, setDeptYear] = useState(new Date().getFullYear());
   const [deptMonth, setDeptMonth] = useState('');
+
+  // Employee attendance detail modal
+  const [empDetailModal, setEmpDetailModal] = useState(false);
+  const [empDetailData, setEmpDetailData] = useState(null);
+  const [empDetailLoading, setEmpDetailLoading] = useState(false);
+  const [selectedEmp, setSelectedEmp] = useState(null);
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   const handleExport = () => {
@@ -389,6 +395,52 @@ const Reports = () => {
     }
   };
 
+  const openEmpDetail = async (emp) => {
+    setSelectedEmp(emp);
+    setEmpDetailModal(true);
+    setEmpDetailLoading(true);
+    setEmpDetailData(null);
+    try {
+      const params = { year: attendanceYear };
+      if (attendanceMonth) params.month = attendanceMonth;
+      const { data } = await reportsAPI.getEmployeeAttendanceDetails(emp._id, params);
+      setEmpDetailData(data.attendances || []);
+    } catch (e) {
+      console.error('Error fetching employee detail:', e);
+      setEmpDetailData([]);
+    } finally {
+      setEmpDetailLoading(false);
+    }
+  };
+
+  const closeEmpDetail = () => {
+    setEmpDetailModal(false);
+    setSelectedEmp(null);
+    setEmpDetailData(null);
+  };
+
+  const formatTime = (ts) => {
+    if (!ts) return '-';
+    return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  const formatDate = (ts) => {
+    if (!ts) return '-';
+    return new Date(ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Present': return themeColors.success;
+      case 'Late': return themeColors.warning;
+      case 'Absent': return themeColors.danger;
+      case 'Half Day': return '#f97316';
+      case 'On Leave': return '#8b5cf6';
+      case 'Early Departure': return '#f59e0b';
+      default: return themeColors.text;
+    }
+  };
+
   const tabs = [
     { id: 'employees', name: 'Employee Reports', icon: Users },
     { id: 'payroll', name: 'Payroll Reports', icon: IndianRupee },
@@ -429,6 +481,7 @@ const Reports = () => {
   }
 
   return (
+    <>
     <div className="space-y-6 p-4" style={{ color: themeColors.text }}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -899,9 +952,9 @@ const Reports = () => {
                 <tbody>
                   {(attendanceReports.employeeStats||[]).length === 0 && <tr><td colSpan={12} className="p-4 text-center" style={{ color: themeColors.textSecondary }}>No data</td></tr>}
                   {(attendanceReports.employeeStats||[]).map((e,i) => (
-                    <tr key={i} className="border-b" style={{ borderColor: themeColors.border }}>
+                    <tr key={i} className="border-b cursor-pointer hover:opacity-80" style={{ borderColor: themeColors.border }} onClick={() => openEmpDetail(e)}>
                       <td className="p-3 whitespace-nowrap">{e.employeeId}</td>
-                      <td className="p-3 whitespace-nowrap">{e.firstName} {e.lastName}</td>
+                      <td className="p-3 whitespace-nowrap font-medium" style={{ color: themeColors.primary }}>{e.firstName} {e.lastName}</td>
                       <td className="p-3 whitespace-nowrap">{e.department||'-'}</td>
                       <td className="p-3 whitespace-nowrap">{e.role}</td>
                       <td className="p-3" style={{ color: themeColors.success }}>{e.present}</td>
@@ -1098,6 +1151,83 @@ const Reports = () => {
 
 
     </div>
+
+      {/* Employee Attendance Detail Modal */}
+      {empDetailModal && selectedEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl" style={{ backgroundColor: themeColors.surface }}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: themeColors.border }}>
+              <div>
+                <h2 className="text-lg font-bold">{selectedEmp.firstName} {selectedEmp.lastName} — Day-wise Attendance</h2>
+                <p className="text-sm mt-0.5" style={{ color: themeColors.textSecondary }}>
+                  {selectedEmp.employeeId} &bull; {selectedEmp.department||'-'} &bull; {selectedEmp.role}
+                  &nbsp;&bull;&nbsp;{attendanceMonth ? MONTHS[attendanceMonth-1]+' ' : ''}{attendanceYear}
+                </p>
+              </div>
+              <button onClick={closeEmpDetail} className="p-2 rounded-lg hover:opacity-70 text-xl font-bold" style={{ color: themeColors.text }}>✕</button>
+            </div>
+
+            {/* Summary Bar */}
+            <div className="grid grid-cols-6 gap-3 p-4 border-b" style={{ borderColor: themeColors.border }}>
+              {[
+                { label: 'Present', value: selectedEmp.present, color: themeColors.success },
+                { label: 'Late', value: selectedEmp.late, color: themeColors.warning },
+                { label: 'Half Day', value: selectedEmp.halfDay, color: '#f97316' },
+                { label: 'On Leave', value: selectedEmp.onLeave, color: '#8b5cf6' },
+                { label: 'Absent', value: selectedEmp.absent, color: themeColors.danger },
+                { label: 'Total Days', value: selectedEmp.totalDays, color: themeColors.primary },
+              ].map(s => (
+                <div key={s.label} className="text-center p-2 rounded-lg" style={{ backgroundColor: s.color + '15' }}>
+                  <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-xs mt-0.5" style={{ color: themeColors.textSecondary }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Records Table */}
+            <div className="overflow-y-auto flex-1">
+              {empDetailLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+                </div>
+              ) : empDetailData && empDetailData.length === 0 ? (
+                <div className="flex items-center justify-center h-40" style={{ color: themeColors.textSecondary }}>No records found for selected period</div>
+              ) : (
+                <table className="w-full border-collapse text-sm">
+                  <thead className="sticky top-0" style={{ backgroundColor: themeColors.surface }}>
+                    <tr style={{ backgroundColor: themeColors.background }}>
+                      {['Date','Status','Punch In','Punch Out','Work Hrs','OT Hrs','Shift','Location'].map(h => (
+                        <th key={h} className="p-3 text-left border-b font-medium whitespace-nowrap" style={{ borderColor: themeColors.border }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(empDetailData||[]).map((rec, i) => (
+                      <tr key={i} className="border-b hover:opacity-80" style={{ borderColor: themeColors.border }}>
+                        <td className="p-3 whitespace-nowrap">{formatDate(rec.date)}</td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: getStatusColor(rec.status) + '20', color: getStatusColor(rec.status) }}>
+                            {rec.status}
+                          </span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">{formatTime(rec.punchIn?.timestamp)}</td>
+                        <td className="p-3 whitespace-nowrap">{formatTime(rec.punchOut?.timestamp)}</td>
+                        <td className="p-3 whitespace-nowrap" style={{ color: themeColors.success }}>{rec.totalWorkHours ? rec.totalWorkHours.toFixed(2) : '-'}</td>
+                        <td className="p-3 whitespace-nowrap" style={{ color: themeColors.warning }}>{rec.overtimeHours ? rec.overtimeHours.toFixed(2) : '-'}</td>
+                        <td className="p-3 whitespace-nowrap">{rec.shift?.name || '-'}</td>
+                        <td className="p-3 whitespace-nowrap">{rec.officeLocation?.officeName || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+    </>
   );
 };
 

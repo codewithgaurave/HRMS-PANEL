@@ -56,6 +56,9 @@ const reportsAPI = {
 
   getDepartmentReports: (params = {}) =>
     axios.get(`${apiRoutes.reports}/departments`, { params, headers: getAuthHeader() }),
+
+  getEmployeeAttendanceDetails: (employeeId, params = {}) =>
+    axios.get(`${apiRoutes.attendance}/${employeeId}/details`, { params, headers: getAuthHeader() }),
 };
 
 export default reportsAPI;

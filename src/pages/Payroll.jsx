@@ -427,8 +427,8 @@ const Payroll = () => {
           className="px-3 py-2 rounded border"
           style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
         >
-          {Array.from({ length: 5 }, (_, i) => (
-            <option key={i} value={new Date().getFullYear() - i}>{new Date().getFullYear() - i}</option>
+          {Array.from({ length: 7 }, (_, i) => (
+            <option key={i} value={new Date().getFullYear() + 1 - i}>{new Date().getFullYear() + 1 - i}</option>
           ))}
         </select>
         <select
@@ -582,8 +582,8 @@ const Payroll = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
                     className="w-full p-2 border rounded" required
                   >
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <option key={i} value={new Date().getFullYear() - i}>{new Date().getFullYear() - i}</option>
+                    {Array.from({ length: 7 }, (_, i) => (
+                      <option key={i} value={new Date().getFullYear() + 1 - i}>{new Date().getFullYear() + 1 - i}</option>
                     ))}
                   </select>
                 </div>

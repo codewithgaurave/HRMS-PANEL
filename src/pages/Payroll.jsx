@@ -17,15 +17,14 @@ const Payroll = () => {
   const [editingPayroll, setEditingPayroll] = useState(null);
 
   const [filters, setFilters] = useState({
-    month: "", 
+    month: "",
     year: new Date().getFullYear(),
     status: "",
     page: 1,
     limit: 10
   });
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalCount: 0, hasNext: false, hasPrev: false });
 
   const [formData, setFormData] = useState({
     employee: "",
@@ -57,6 +56,7 @@ const Payroll = () => {
       };
       const { data } = await payrollAPI.getHRTeamPayrolls(params);
       setPayrolls(data.payrolls || []);
+      if (data.pagination) setPagination(data.pagination);
     } catch (err) {
       setError(err.response?.data?.message || "Error fetching payrolls");
     } finally {
@@ -336,14 +336,7 @@ const Payroll = () => {
 
   const clearFilters = () => {
     setFilters({ month: "", year: new Date().getFullYear(), status: "", page: 1, limit: 10 });
-    setCurrentPage(1);
   };
-
-  const totalItems = payrolls.length;
-  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
-  const startIndex = itemsPerPage === 'all' ? 0 : (currentPage - 1) * itemsPerPage;
-  const endIndex = itemsPerPage === 'all' ? totalItems : startIndex + itemsPerPage;
-  const paginatedPayrolls = payrolls.slice(startIndex, endIndex);
 
   const resetForm = () => {
     setFormData({
@@ -473,7 +466,7 @@ const Payroll = () => {
             </tr>
           </thead>
           <tbody>
-            {paginatedPayrolls.map((payroll) => (
+            {payrolls.map((payroll) => (
               <tr key={payroll._id} className="border-b" style={{ borderColor: themeColors.border }}>
                 <td className="p-3 text-sm">
                   <div className="font-medium">{payroll.employee?.name?.first} {payroll.employee?.name?.last}</div>
@@ -519,23 +512,23 @@ const Payroll = () => {
           <div className="flex items-center gap-2">
             <span className="text-sm">Show</span>
             <select
-              value={itemsPerPage}
-              onChange={(e) => { setItemsPerPage(e.target.value === 'all' ? 'all' : parseInt(e.target.value)); setCurrentPage(1); }}
+              value={filters.limit}
+              onChange={(e) => setFilters(prev => ({ ...prev, limit: parseInt(e.target.value), page: 1 }))}
               className="px-3 py-1 rounded-md border text-sm"
               style={{ backgroundColor: themeColors.background, borderColor: themeColors.border, color: themeColors.text }}
             >
-              <option value="10">10</option><option value="20">20</option><option value="all">All</option>
+              <option value="10">10</option><option value="20">20</option><option value="50">50</option>
             </select>
             <span className="text-sm">entries</span>
           </div>
-          <div className="text-sm text-gray-500">Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries</div>
-          {itemsPerPage !== 'all' && (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(prev => prev - 1)} disabled={currentPage === 1} className="px-3 py-1 rounded border disabled:opacity-50">Previous</button>
-              <span className="text-sm">Page {currentPage} of {totalPages}</span>
-              <button onClick={() => setCurrentPage(prev => prev + 1)} disabled={currentPage === totalPages} className="px-3 py-1 rounded border disabled:opacity-50">Next</button>
-            </div>
-          )}
+          <div className="text-sm text-gray-500">
+            Showing {((filters.page - 1) * filters.limit) + 1} to {Math.min(filters.page * filters.limit, pagination.totalCount)} of {pagination.totalCount} entries
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))} disabled={!pagination.hasPrev} className="px-3 py-1 rounded border disabled:opacity-50">Previous</button>
+            <span className="text-sm">Page {pagination.currentPage} of {pagination.totalPages}</span>
+            <button onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))} disabled={!pagination.hasNext} className="px-3 py-1 rounded border disabled:opacity-50">Next</button>
+          </div>
         </div>
       </div>
 

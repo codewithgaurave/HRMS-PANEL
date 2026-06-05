@@ -50,7 +50,12 @@ const Payroll = () => {
   const fetchPayrolls = async () => {
     try {
       setLoading(true);
-      const { data } = await payrollAPI.getHRTeamPayrolls(filters);
+      const params = {
+        ...filters,
+        month: filters.month ? parseInt(filters.month) : "",
+        year: filters.year ? parseInt(filters.year) : "",
+      };
+      const { data } = await payrollAPI.getHRTeamPayrolls(params);
       setPayrolls(data.payrolls || []);
     } catch (err) {
       setError(err.response?.data?.message || "Error fetching payrolls");

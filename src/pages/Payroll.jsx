@@ -321,14 +321,14 @@ const Payroll = () => {
   const handleGenerateAll = async () => {
     if (!filters.month) { toast.error('Please select the month first'); return; }
     const monthName = getMonthName(filters.month);
-    const existingPayrolls = payrolls.filter(p => p.month === parseInt(filters.month) && p.year === parseInt(filters.year));
-    if (existingPayrolls.length > 0) {
-      toast.error(`Payroll already generated for ${monthName} ${filters.year}`);
-      return;
-    }
     try {
-      await payrollAPI.generateForAll({ month: filters.month, year: filters.year });
-      toast.success(`Payrolls generated successfully!`); fetchPayrolls();
+      const result = await payrollAPI.generateForAll({ month: filters.month, year: filters.year });
+      if (result.count === 0) {
+        toast.info(`Payroll already generated for all employees for ${monthName} ${filters.year}`);
+      } else {
+        toast.success(`Payrolls generated for ${result.count} employees!`);
+      }
+      fetchPayrolls();
     } catch (err) {
       toast.error(err.response?.data?.message || "Error generating payrolls");
     }

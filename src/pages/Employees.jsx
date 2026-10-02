@@ -4,7 +4,8 @@ import { useTheme } from "../context/ThemeContext";
 import employeeAPI from "../apis/employeeAPI";
 import CreateEmployeeModal from "./modals/CreateEmployeeModal";
 import UpdateEmployeeModal from "./modals/UpdateEmployeeModal";
-import { Eye, EyeOff } from "lucide-react";
+import ResetPasswordModal from "./modals/ResetPasswordModal";
+import { Eye, EyeOff, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // Debounce hook
@@ -34,7 +35,9 @@ const Employees = () => {
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [resetEmployee, setResetEmployee] = useState(null);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -441,40 +444,55 @@ const Employees = () => {
                     </span>
                   </td>
                   <td className="p-3">
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 flex-wrap">
                       <button
                         onClick={() => startEditing(employee)}
-                        className="px-3 py-1 rounded text-xs text-white cursor-pointer"
+                        className="px-2.5 py-1 rounded text-xs text-white cursor-pointer hover:opacity-90 transition-opacity"
                         style={{ backgroundColor: themeColors.primary }}
+                        title="Edit Employee Details"
                       >
                         Edit
                       </button>
                       <button
+                        onClick={() => {
+                          setResetEmployee(employee);
+                          setShowResetModal(true);
+                        }}
+                        className="px-2.5 py-1 rounded text-white text-xs cursor-pointer flex items-center gap-1 hover:opacity-90 transition-opacity"
+                        style={{ backgroundColor: '#f59e0b' }}
+                        title="Reset Employee Password"
+                      >
+                        <Key size={13} />
+                        <span>Pass</span>
+                      </button>
+                      <button
                         onClick={() => handleToggleStatus(employee._id)}
-                        className="px-3 py-1 rounded text-white text-xs border cursor-pointer flex items-center gap-1"
+                        className="px-2 py-1 rounded text-white text-xs border cursor-pointer flex items-center gap-1 hover:opacity-90 transition-opacity"
                         style={{
                           backgroundColor: employee.isActive ? themeColors.danger : themeColors.success,
                           borderColor: themeColors.border
                         }}
+                        title={employee.isActive ? 'Deactivate Employee' : 'Activate Employee'}
                       >
                         {employee.isActive ? <EyeOff size={14} /> : <Eye size={14} />}
-                        {/* <span>{employee.isActive ? 'Deactivate' : 'Activate'}</span> */}
                       </button>
                       <button
                         onClick={() => handleProfileClick(employee._id)}
-                        className="px-3 py-1 rounded text-white text-xs border border-green-300 cursor-pointer"
+                        className="px-2.5 py-1 rounded text-white text-xs border border-green-300 cursor-pointer hover:opacity-90 transition-opacity"
                         style={{
                           backgroundColor: themeColors.success
                         }}
+                        title="View Full Profile"
                       >
                         Profile
                       </button>
                       <button
                         onClick={() => handleDelete(employee._id)}
-                        className="px-3 py-1 rounded text-white text-xs border border-red-300 cursor-pointer"
+                        className="px-2.5 py-1 rounded text-white text-xs border border-red-300 cursor-pointer hover:opacity-90 transition-opacity"
                         style={{
                           backgroundColor: themeColors.danger
                         }}
+                        title="Delete Employee"
                       >
                         Delete
                       </button>
@@ -561,6 +579,15 @@ const Employees = () => {
         }}
         employee={selectedEmployee}
         onEmployeeUpdated={handleEmployeeUpdated}
+      />
+
+      <ResetPasswordModal
+        isOpen={showResetModal}
+        onClose={() => {
+          setShowResetModal(false);
+          setResetEmployee(null);
+        }}
+        employee={resetEmployee}
       />
     </div>
   );

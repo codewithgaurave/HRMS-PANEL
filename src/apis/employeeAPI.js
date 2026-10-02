@@ -48,6 +48,11 @@ const employeeAPI = {
       headers: getAuthHeader(),
     }),
 
+  resetPassword: (id, newPassword) =>
+    axios.patch(`${apiRoutes.employees}/${id}/reset-password`, { newPassword }, {
+      headers: getAuthHeader(),
+    }),
+
   // ----------------- SECTION-SPECIFIC UPDATES -----------------
   updateBasicInfo: (id, data) =>
     axios.patch(`${apiRoutes.employees}/${id}/basic-info`, data, {

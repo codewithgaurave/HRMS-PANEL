@@ -10,6 +10,8 @@ import designationAPI from '../apis/designationAPI';
 import employmentStatusAPI from '../apis/employmentStatusAPI';
 import officeLocationAPI from '../apis/officeLocationAPI';
 import workShiftAPI from '../apis/workShiftAPI';
+import ResetPasswordModal from '../pages/modals/ResetPasswordModal';
+import { Key } from 'lucide-react';
 
 // Section Components
 import BasicInfoSection from './employeeProfile/BasicInfoSection';
@@ -29,6 +31,7 @@ const EmployeeProfile = () => {
   const [activeTab, setActiveTab] = useState('basic-info');
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // Use URL id if available, otherwise use logged-in user's id
   const id = urlId || user?._id;
@@ -288,17 +291,30 @@ const EmployeeProfile = () => {
                 )}
               </p>
             </div>
-            <button
-              onClick={() => navigate('/employees')}
-              className="px-6 py-2 rounded-lg font-medium border transition-colors"
-              style={{
-                backgroundColor: themeColors.background,
-                borderColor: themeColors.border,
-                color: themeColors.text
-              }}
-            >
-              Back
-            </button>
+            <div className="flex items-center gap-3">
+              {user?.role === 'HR_Manager' && (
+                <button
+                  onClick={() => setShowResetModal(true)}
+                  className="px-4 py-2 rounded-lg font-medium text-white flex items-center gap-1.5 transition-all hover:scale-105"
+                  style={{ backgroundColor: '#f59e0b' }}
+                  title="Reset Password for this employee"
+                >
+                  <Key size={15} />
+                  <span>Reset Password</span>
+                </button>
+              )}
+              <button
+                onClick={() => navigate('/employees')}
+                className="px-6 py-2 rounded-lg font-medium border transition-colors"
+                style={{
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border,
+                  color: themeColors.text
+                }}
+              >
+                Back
+              </button>
+            </div>
           </div>
         </div>
 
@@ -403,11 +419,15 @@ const EmployeeProfile = () => {
                 canEdit={user?.role !== 'Employee' && canEditSection('personal-info', user?.role, employee?._id, user?._id)}
               />
             )}
-
-
           </div>
         </div>
       </div>
+
+      <ResetPasswordModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        employee={employee}
+      />
     </div>
   );
 };

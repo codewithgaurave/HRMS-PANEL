@@ -10,7 +10,7 @@ const taskAPI = {
   reviewTask: (id, data) => api.put(`/tasks/${id}/review`, data),
   delete: (id) => api.delete(`/tasks/${id}`),
   restoreTask: (id) => api.patch(`/tasks/${id}`, {}),
-  getStats: () => api.get('/tasks/stats'),
+  getStats: (params = {}) => api.get('/tasks/stats', { params }),
   getAssignableEmployees: () => api.get('/tasks/assignable-employees'),
   getDeadlineAlerts: () => api.get('/tasks/alerts/deadline'),
 };

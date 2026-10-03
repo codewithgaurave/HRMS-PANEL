@@ -7,14 +7,15 @@ import { BarChart3, Users, IndianRupee, Package, TrendingUp, Download, Calendar 
 
 // Export utility functions
 const exportToCSV = (data, filename) => {
-  const csvContent = "data:text/csv;charset=utf-8," + data;
-  const encodedUri = encodeURI(csvContent);
+  const blob = new Blob(["\uFEFF" + data], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
+  link.setAttribute("href", url);
   link.setAttribute("download", `${filename}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 const convertToCSV = (objArray, headers) => {
@@ -61,6 +62,7 @@ const Reports = () => {
   const [empDetailModal, setEmpDetailModal] = useState(false);
   const [empDetailData, setEmpDetailData] = useState(null);
   const [empDetailLoading, setEmpDetailLoading] = useState(false);
+  const [empDetailSubTab, setEmpDetailSubTab] = useState('attendance');
   const [selectedEmp, setSelectedEmp] = useState(null);
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -237,25 +239,131 @@ const Reports = () => {
       case 'attendance':
         if (attendanceReports) {
           const aLabel = attendanceMonth ? `${MONTHS[parseInt(attendanceMonth)-1]} ${attendanceYear}` : `Year ${attendanceYear}`;
-          let csv = `"ATTENDANCE REPORT","Period: ${aLabel}",,,,,,,,\r\n`;
-          csv += `"Generated On","${new Date().toLocaleDateString('en-IN')}",,,,,,,,\r\n`;
-          csv += `"Team Size","${attendanceReports.teamSize || 0}",,,,,,,,\r\n`;
-          csv += `"Average Attendance","${attendanceReports.averageAttendance}%",,,,,,,,\r\n`;
+          let csv = `"ATTENDANCE & ACTIVITY REPORT","Period: ${aLabel}",,,,,,,,,,,,\r\n`;
+          csv += `"Generated On","${new Date().toLocaleDateString('en-IN')}",,,,,,,,,,,,\r\n`;
+          csv += `"Team Size","${attendanceReports.teamSize || 0}",,,,,,,,,,,,\r\n`;
+          csv += `"Average Attendance","${attendanceReports.averageAttendance}%",,,,,,,,,,,,\r\n`;
 
-          csv += `\r\n"=== MONTHLY SUMMARY ===",,,,,,,,\r\n`;
-          csv += '"Month","Year","Present","Late","Half Day","On Leave","Absent","Work Hours","OT Hours"\r\n';
+          // 1. Monthly Summary
+          csv += `\r\n"=== MONTHLY SUMMARY ===",,,,,,,,,,,,\r\n`;
+          csv += '"Month","Year","Present","Late","Half Day","On Leave","Absent","Work Hours","OT Hours",,,,\r\n';
           (attendanceReports.monthlyStats || []).forEach(m => {
-            csv += `"${MONTHS[m._id.month-1]}","${m._id.year}","${m.present}","${m.late}","${m.halfDay}","${m.onLeave}","${m.absent}","${m.totalWorkHours?.toFixed(1)}","${m.overtimeHours?.toFixed(1)}"\r\n`;
+            csv += `"${MONTHS[m._id.month-1]}","${m._id.year}","${m.present}","${m.late}","${m.halfDay}","${m.onLeave}","${m.absent}","${m.totalWorkHours?.toFixed(1)}","${m.overtimeHours?.toFixed(1)}",,,,\r\n`;
           });
+          if (!(attendanceReports.monthlyStats || []).length) csv += '"No monthly summary data",,,,,,,,,,,,\r\n';
 
-          csv += `\r\n"=== EMPLOYEE WISE ATTENDANCE ===",,,,,,,,\r\n`;
+          // 2. Employee Wise Attendance Summary
+          csv += `\r\n"=== EMPLOYEE WISE ATTENDANCE SUMMARY ===",,,,,,,,,,,,\r\n`;
           csv += '"Emp ID","First Name","Last Name","Email","Department","Role","Present","Late","Half Day","On Leave","Absent","Total Days","Work Hours","OT Hours"\r\n';
           (attendanceReports.employeeStats || []).forEach(e => {
-            const row = [e.employeeId,e.firstName,e.lastName,e.email,e.department||'',e.role,e.present,e.late,e.halfDay,e.onLeave,e.absent,e.totalDays,e.totalWorkHours?.toFixed(1),e.overtimeHours?.toFixed(1)]
-              .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
+            const row = [
+              e.employeeId || '',
+              e.firstName || '',
+              e.lastName || '',
+              e.email || '',
+              e.department || '',
+              e.role || '',
+              e.present ?? 0,
+              e.late ?? 0,
+              e.halfDay ?? 0,
+              e.onLeave ?? 0,
+              e.absent ?? 0,
+              e.totalDays ?? 0,
+              e.totalWorkHours != null ? Number(e.totalWorkHours).toFixed(1) : '0',
+              e.overtimeHours != null ? Number(e.overtimeHours).toFixed(1) : '0'
+            ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
             csv += row + '\r\n';
           });
-          exportToCSV(csv, `attendance-report-${attendanceYear}${attendanceMonth?'-'+String(attendanceMonth).padStart(2,'0'):''}-${currentDate}`);
+          if (!(attendanceReports.employeeStats || []).length) csv += '"No employee attendance summary",,,,,,,,,,,,,\r\n';
+
+          // 3. Daily Attendance Breakdown (Employee Wise)
+          csv += `\r\n"=== DAILY ATTENDANCE BREAKDOWN (EMPLOYEE WISE) ===",,,,,,,,,,,,\r\n`;
+          csv += '"Emp ID","Employee Name","Email","Department","Date","Check-in Time","Check-out Time","Status","Work Hours","OT Hours","Shift","Location","Early Departure Reason"\r\n';
+          (attendanceReports.dailyAttendance || []).forEach(d => {
+            const emp = d.employee || {};
+            const empName = `${emp.name?.first || ''} ${emp.name?.last || ''}`.trim() || emp.name || '';
+            const deptName = emp.department?.name || emp.department || '';
+            const dateStr = d.date ? new Date(d.date).toLocaleDateString('en-IN') : '';
+            const checkIn = d.punchIn?.timestamp ? new Date(d.punchIn.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
+            const checkOut = d.punchOut?.timestamp ? new Date(d.punchOut.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
+            const shiftName = d.shift?.name || d.shift || '-';
+            const locName = d.officeLocation?.officeName || d.officeLocation || '-';
+            const row = [
+              emp.employeeId || '',
+              empName,
+              emp.email || '',
+              deptName,
+              dateStr,
+              checkIn,
+              checkOut,
+              d.status || '',
+              d.totalWorkHours != null ? Number(d.totalWorkHours).toFixed(2) : '0',
+              d.overtimeHours != null ? Number(d.overtimeHours).toFixed(2) : '0',
+              shiftName,
+              locName,
+              d.earlyDepartureReason || ''
+            ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+            csv += row + '\r\n';
+          });
+          if (!(attendanceReports.dailyAttendance || []).length) csv += '"No daily attendance logs found for selected period",,,,,,,,,,,,\r\n';
+
+          // 4. Daily Tasks Report (Employee Wise)
+          csv += `\r\n"=== DAILY TASKS REPORT (EMPLOYEE WISE) ===",,,,,,,,,,,,\r\n`;
+          csv += '"Emp ID","Employee Name","Email","Department","Task Title","Task Type","Priority","Status","Assigned Date","Due Date / Deadline","Description / Remarks"\r\n';
+          (attendanceReports.employeeTasks || []).forEach(t => {
+            const emp = t.assignedTo || {};
+            const empName = `${emp.name?.first || ''} ${emp.name?.last || ''}`.trim() || emp.name || '';
+            const deptName = emp.department?.name || emp.department || '';
+            const assignedDate = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : '';
+            const dueDate = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : (t.deadline ? new Date(t.deadline).toLocaleDateString('en-IN') : '');
+            const taskTypeName = t.taskType?.name || t.taskType || 'General';
+            const cleanDesc = (t.description || t.statusRemarks || '').replace(/\r?\n|\r/g, ' ');
+            const row = [
+              emp.employeeId || '',
+              empName,
+              emp.email || '',
+              deptName,
+              t.title || '',
+              taskTypeName,
+              t.priority || 'Medium',
+              t.status || 'New',
+              assignedDate,
+              dueDate,
+              cleanDesc
+            ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+            csv += row + '\r\n';
+          });
+          if (!(attendanceReports.employeeTasks || []).length) csv += '"No tasks found for selected period",,,,,,,,,,\r\n';
+
+          // 5. Employee Assets Report
+          csv += `\r\n"=== EMPLOYEE ASSETS REPORT ===",,,,,,,,,,,,\r\n`;
+          csv += '"Emp ID","Employee Name","Email","Department","Asset ID","Asset Name","Category","Brand","Model","Serial No","Assigned Date","Return Date","Status"\r\n';
+          (attendanceReports.employeeAssets || []).forEach(a => {
+            const emp = a.employee || {};
+            const empName = `${emp.name?.first || ''} ${emp.name?.last || ''}`.trim() || emp.name || '';
+            const deptName = emp.department?.name || emp.department || '';
+            const assignedDate = a.assignedDate ? new Date(a.assignedDate).toLocaleDateString('en-IN') : '';
+            const returnDate = a.returnDate ? new Date(a.returnDate).toLocaleDateString('en-IN') : (a.isActive ? 'Still Assigned' : 'Returned');
+            const row = [
+              emp.employeeId || '',
+              empName,
+              emp.email || '',
+              deptName,
+              a.assetId || '',
+              a.name || '',
+              a.category || '',
+              a.brand || '',
+              a.model || '',
+              a.serialNumber || '',
+              assignedDate,
+              returnDate,
+              a.status || (a.isActive ? 'Active' : 'Returned')
+            ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+            csv += row + '\r\n';
+          });
+          if (!(attendanceReports.employeeAssets || []).length) csv += '"No assigned assets for selected employees",,,,,,,,,,,,\r\n';
+
+          exportToCSV(csv, `comprehensive-attendance-report-${attendanceYear}${attendanceMonth ? '-' + String(attendanceMonth).padStart(2, '0') : ''}-${currentDate}`);
         }
         break;
 
@@ -397,6 +505,7 @@ const Reports = () => {
 
   const openEmpDetail = async (emp) => {
     setSelectedEmp(emp);
+    setEmpDetailSubTab('attendance');
     setEmpDetailModal(true);
     setEmpDetailLoading(true);
     setEmpDetailData(null);
@@ -417,6 +526,98 @@ const Reports = () => {
     setEmpDetailModal(false);
     setSelectedEmp(null);
     setEmpDetailData(null);
+  };
+
+  const handleExportSingleEmployee = (emp) => {
+    if (!emp) return;
+    const aLabel = attendanceMonth ? `${MONTHS[parseInt(attendanceMonth)-1]} ${attendanceYear}` : `Year ${attendanceYear}`;
+    const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name || '';
+    const empId = emp.employeeId || '';
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    let csv = `"EMPLOYEE COMPREHENSIVE REPORT - ${empName} (${empId})","Period: ${aLabel}",,,,,,,,\r\n`;
+    csv += `"Generated On","${new Date().toLocaleDateString('en-IN')}",,,,,,,,\r\n`;
+    csv += `"Department","${emp.department || 'N/A'}",,,,,,,,\r\n`;
+    csv += `"Role","${emp.role || 'N/A'}",,,,,,,,\r\n`;
+    csv += `"Email","${emp.email || 'N/A'}",,,,,,,,\r\n`;
+
+    // 1. Attendance Summary
+    csv += `\r\n"=== ATTENDANCE SUMMARY ===",,,,,,,,\r\n`;
+    csv += '"Present","Late","Half Day","On Leave","Absent","Total Days","Work Hours","OT Hours"\r\n';
+    csv += `"${emp.present ?? 0}","${emp.late ?? 0}","${emp.halfDay ?? 0}","${emp.onLeave ?? 0}","${emp.absent ?? 0}","${emp.totalDays ?? 0}","${emp.totalWorkHours != null ? Number(emp.totalWorkHours).toFixed(1) : '0'}","${emp.overtimeHours != null ? Number(emp.overtimeHours).toFixed(1) : '0'}"\r\n`;
+
+    // 2. Day-wise Attendance
+    csv += `\r\n"=== DAY-WISE ATTENDANCE LOGS ===",,,,,,,,\r\n`;
+    csv += '"Date","Status","Punch In","Punch Out","Work Hours","OT Hours","Shift","Location","Early Departure Reason"\r\n';
+    const empLogs = (empDetailData && empDetailData.length > 0)
+      ? empDetailData
+      : (attendanceReports?.dailyAttendance || []).filter(d => (d.employee?._id?.toString() === emp._id?.toString() || d.employee?.employeeId === emp.employeeId));
+    (empLogs || []).forEach(d => {
+      const dateStr = d.date ? new Date(d.date).toLocaleDateString('en-IN') : '';
+      const checkIn = d.punchIn?.timestamp ? new Date(d.punchIn.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
+      const checkOut = d.punchOut?.timestamp ? new Date(d.punchOut.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
+      const shiftName = d.shift?.name || d.shift || '-';
+      const locName = d.officeLocation?.officeName || d.officeLocation || '-';
+      const row = [
+        dateStr,
+        d.status || '',
+        checkIn,
+        checkOut,
+        d.totalWorkHours != null ? Number(d.totalWorkHours).toFixed(2) : '0',
+        d.overtimeHours != null ? Number(d.overtimeHours).toFixed(2) : '0',
+        shiftName,
+        locName,
+        d.earlyDepartureReason || ''
+      ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+      csv += row + '\r\n';
+    });
+    if (!empLogs?.length) csv += '"No attendance logs found for this period",,,,,,,,\r\n';
+
+    // 3. Tasks
+    csv += `\r\n"=== TASKS REPORT ===",,,,,,,,\r\n`;
+    csv += '"Task Title","Task Type","Priority","Status","Assigned Date","Due Date / Deadline","Remarks / Description"\r\n';
+    const empTasks = (attendanceReports?.employeeTasks || []).filter(t => (t.assignedTo?._id?.toString() === emp._id?.toString() || t.assignedTo?.employeeId === emp.employeeId));
+    empTasks.forEach(t => {
+      const assignedDate = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : '';
+      const dueDate = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : (t.deadline ? new Date(t.deadline).toLocaleDateString('en-IN') : '');
+      const taskTypeName = t.taskType?.name || t.taskType || 'General';
+      const cleanDesc = (t.description || t.statusRemarks || '').replace(/\r?\n|\r/g, ' ');
+      const row = [
+        t.title || '',
+        taskTypeName,
+        t.priority || 'Medium',
+        t.status || 'New',
+        assignedDate,
+        dueDate,
+        cleanDesc
+      ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+      csv += row + '\r\n';
+    });
+    if (!empTasks.length) csv += '"No tasks found for this employee",,,,,,\r\n';
+
+    // 4. Assets
+    csv += `\r\n"=== ASSIGNED ASSETS ===",,,,,,,,\r\n`;
+    csv += '"Asset ID","Asset Name","Category","Brand","Model","Serial No","Assigned Date","Return Date","Status"\r\n';
+    const empAssets = (attendanceReports?.employeeAssets || []).filter(a => (a.employee?._id?.toString() === emp._id?.toString() || a.employee?.employeeId === emp.employeeId));
+    empAssets.forEach(a => {
+      const assignedDate = a.assignedDate ? new Date(a.assignedDate).toLocaleDateString('en-IN') : '';
+      const returnDate = a.returnDate ? new Date(a.returnDate).toLocaleDateString('en-IN') : (a.isActive ? 'Still Assigned' : 'Returned');
+      const row = [
+        a.assetId || '',
+        a.name || '',
+        a.category || '',
+        a.brand || '',
+        a.model || '',
+        a.serialNumber || '',
+        assignedDate,
+        returnDate,
+        a.status || (a.isActive ? 'Active' : 'Returned')
+      ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+      csv += row + '\r\n';
+    });
+    if (!empAssets.length) csv += '"No assets assigned to this employee",,,,,,,,\r\n';
+
+    exportToCSV(csv, `${empId}-${empName.replace(/\s+/g, '_')}-report-${attendanceYear}${attendanceMonth ? '-' + String(attendanceMonth).padStart(2, '0') : ''}-${currentDate}`);
   };
 
   const formatTime = (ts) => {
@@ -1153,19 +1354,34 @@ const Reports = () => {
     </div>
 
     {/* Employee Attendance Detail Modal */}
-    {empDetailModal && selectedEmp && (
+    {empDetailModal && selectedEmp && (() => {
+      const empTasks = (attendanceReports?.employeeTasks || []).filter(t => (t.assignedTo?._id?.toString() === selectedEmp._id?.toString() || t.assignedTo?.employeeId === selectedEmp.employeeId));
+      const empAssets = (attendanceReports?.employeeAssets || []).filter(a => (a.employee?._id?.toString() === selectedEmp._id?.toString() || a.employee?.employeeId === selectedEmp.employeeId));
+
+      return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl" style={{ backgroundColor: themeColors.surface }}>
+          <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl" style={{ backgroundColor: themeColors.surface }}>
             {/* Modal Header */}
             <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: themeColors.border }}>
               <div>
-                <h2 className="text-lg font-bold">{selectedEmp.firstName} {selectedEmp.lastName} — Day-wise Attendance</h2>
+                <h2 className="text-lg font-bold">{selectedEmp.firstName} {selectedEmp.lastName} — Employee Details & Report</h2>
                 <p className="text-sm mt-0.5" style={{ color: themeColors.textSecondary }}>
                   {selectedEmp.employeeId} &bull; {selectedEmp.department||'-'} &bull; {selectedEmp.role}
                   &nbsp;&bull;&nbsp;{attendanceMonth ? MONTHS[attendanceMonth-1]+' ' : ''}{attendanceYear}
                 </p>
               </div>
-              <button onClick={closeEmpDetail} className="p-2 rounded-lg hover:opacity-70 text-xl font-bold" style={{ color: themeColors.text }}>✕</button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => handleExportSingleEmployee(selectedEmp)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-sm hover:opacity-90 transition-all"
+                  style={{ backgroundColor: themeColors.primary }}
+                  title="Export this employee's complete excel report"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export Excel / CSV</span>
+                </button>
+                <button onClick={closeEmpDetail} className="p-2 rounded-lg hover:opacity-70 text-xl font-bold" style={{ color: themeColors.text }}>✕</button>
+              </div>
             </div>
 
             {/* Summary Bar */}
@@ -1185,47 +1401,154 @@ const Reports = () => {
               ))}
             </div>
 
-            {/* Records Table */}
-            <div className="overflow-y-auto flex-1">
-              {empDetailLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: themeColors.primary }}></div>
-                </div>
-              ) : empDetailData && empDetailData.length === 0 ? (
-                <div className="flex items-center justify-center h-40" style={{ color: themeColors.textSecondary }}>No records found for selected period</div>
-              ) : (
-                <table className="w-full border-collapse text-sm">
-                  <thead className="sticky top-0" style={{ backgroundColor: themeColors.surface }}>
-                    <tr style={{ backgroundColor: themeColors.background }}>
-                      {['Date','Status','Punch In','Punch Out','Work Hrs','OT Hrs','Shift','Location'].map(h => (
-                        <th key={h} className="p-3 text-left border-b font-medium whitespace-nowrap" style={{ borderColor: themeColors.border }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(empDetailData||[]).map((rec, i) => (
-                      <tr key={i} className="border-b hover:opacity-80" style={{ borderColor: themeColors.border }}>
-                        <td className="p-3 whitespace-nowrap">{formatDate(rec.date)}</td>
-                        <td className="p-3 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: getStatusColor(rec.status) + '20', color: getStatusColor(rec.status) }}>
-                            {rec.status}
-                          </span>
-                        </td>
-                        <td className="p-3 whitespace-nowrap">{formatTime(rec.punchIn?.timestamp)}</td>
-                        <td className="p-3 whitespace-nowrap">{formatTime(rec.punchOut?.timestamp)}</td>
-                        <td className="p-3 whitespace-nowrap" style={{ color: themeColors.success }}>{rec.totalWorkHours ? rec.totalWorkHours.toFixed(2) : '-'}</td>
-                        <td className="p-3 whitespace-nowrap" style={{ color: themeColors.warning }}>{rec.overtimeHours ? rec.overtimeHours.toFixed(2) : '-'}</td>
-                        <td className="p-3 whitespace-nowrap">{rec.shift?.name || '-'}</td>
-                        <td className="p-3 whitespace-nowrap">{rec.officeLocation?.officeName || '-'}</td>
+            {/* Sub-tab Switcher */}
+            <div className="flex border-b px-4 gap-2 pt-2" style={{ borderColor: themeColors.border, backgroundColor: themeColors.background }}>
+              {[
+                { id: 'attendance', label: `📅 Daily Attendance (${empDetailData ? empDetailData.length : 0})` },
+                { id: 'tasks', label: `📋 Daily Tasks (${empTasks.length})` },
+                { id: 'assets', label: `💻 Assigned Assets (${empAssets.length})` },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setEmpDetailSubTab(tab.id)}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    empDetailSubTab === tab.id ? 'border-primary' : 'border-transparent opacity-70 hover:opacity-100'
+                  }`}
+                  style={{
+                    borderColor: empDetailSubTab === tab.id ? themeColors.primary : 'transparent',
+                    color: empDetailSubTab === tab.id ? themeColors.primary : themeColors.text
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto flex-1 p-2">
+              {empDetailSubTab === 'attendance' && (
+                empDetailLoading ? (
+                  <div className="flex items-center justify-center h-40">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2" style={{ borderColor: themeColors.primary }}></div>
+                  </div>
+                ) : empDetailData && empDetailData.length === 0 ? (
+                  <div className="flex items-center justify-center h-40" style={{ color: themeColors.textSecondary }}>No attendance records found for selected period</div>
+                ) : (
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="sticky top-0" style={{ backgroundColor: themeColors.surface }}>
+                      <tr style={{ backgroundColor: themeColors.background }}>
+                        {['Date','Status','Punch In','Punch Out','Work Hrs','OT Hrs','Shift','Location'].map(h => (
+                          <th key={h} className="p-3 text-left border-b font-medium whitespace-nowrap" style={{ borderColor: themeColors.border }}>{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {(empDetailData||[]).map((rec, i) => (
+                        <tr key={i} className="border-b hover:opacity-80" style={{ borderColor: themeColors.border }}>
+                          <td className="p-3 whitespace-nowrap">{formatDate(rec.date)}</td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: getStatusColor(rec.status) + '20', color: getStatusColor(rec.status) }}>
+                              {rec.status}
+                            </span>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">{formatTime(rec.punchIn?.timestamp)}</td>
+                          <td className="p-3 whitespace-nowrap">{formatTime(rec.punchOut?.timestamp)}</td>
+                          <td className="p-3 whitespace-nowrap" style={{ color: themeColors.success }}>{rec.totalWorkHours ? rec.totalWorkHours.toFixed(2) : '-'}</td>
+                          <td className="p-3 whitespace-nowrap" style={{ color: themeColors.warning }}>{rec.overtimeHours ? rec.overtimeHours.toFixed(2) : '-'}</td>
+                          <td className="p-3 whitespace-nowrap">{rec.shift?.name || '-'}</td>
+                          <td className="p-3 whitespace-nowrap">{rec.officeLocation?.officeName || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              )}
+
+              {empDetailSubTab === 'tasks' && (
+                empTasks.length === 0 ? (
+                  <div className="flex items-center justify-center h-40" style={{ color: themeColors.textSecondary }}>No tasks assigned for this employee in the selected period</div>
+                ) : (
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="sticky top-0" style={{ backgroundColor: themeColors.surface }}>
+                      <tr style={{ backgroundColor: themeColors.background }}>
+                        {['Task Title','Type','Priority','Status','Assigned Date','Due Date','Description'].map(h => (
+                          <th key={h} className="p-3 text-left border-b font-medium whitespace-nowrap" style={{ borderColor: themeColors.border }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {empTasks.map((t, i) => (
+                        <tr key={i} className="border-b hover:opacity-80" style={{ borderColor: themeColors.border }}>
+                          <td className="p-3 font-medium whitespace-nowrap">{t.title}</td>
+                          <td className="p-3 whitespace-nowrap">{t.taskType?.name || 'General'}</td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                              backgroundColor: t.priority==='Urgent'||t.priority==='High'?themeColors.danger+'20':themeColors.primary+'20',
+                              color: t.priority==='Urgent'||t.priority==='High'?themeColors.danger:themeColors.primary
+                            }}>
+                              {t.priority}
+                            </span>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                              backgroundColor: t.status==='Completed'||t.status==='Approved'?themeColors.success+'20':themeColors.warning+'20',
+                              color: t.status==='Completed'||t.status==='Approved'?themeColors.success:themeColors.warning
+                            }}>
+                              {t.status}
+                            </span>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">{formatDate(t.createdAt)}</td>
+                          <td className="p-3 whitespace-nowrap">{formatDate(t.dueDate || t.deadline)}</td>
+                          <td className="p-3 text-xs max-w-xs truncate" title={t.description || t.statusRemarks || ''}>
+                            {t.description || t.statusRemarks || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              )}
+
+              {empDetailSubTab === 'assets' && (
+                empAssets.length === 0 ? (
+                  <div className="flex items-center justify-center h-40" style={{ color: themeColors.textSecondary }}>No assets assigned to this employee</div>
+                ) : (
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="sticky top-0" style={{ backgroundColor: themeColors.surface }}>
+                      <tr style={{ backgroundColor: themeColors.background }}>
+                        {['Asset ID','Name','Category','Brand / Model','Serial No','Assigned Date','Status'].map(h => (
+                          <th key={h} className="p-3 text-left border-b font-medium whitespace-nowrap" style={{ borderColor: themeColors.border }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {empAssets.map((a, i) => (
+                        <tr key={i} className="border-b hover:opacity-80" style={{ borderColor: themeColors.border }}>
+                          <td className="p-3 font-mono font-medium whitespace-nowrap">{a.assetId}</td>
+                          <td className="p-3 font-medium whitespace-nowrap">{a.name}</td>
+                          <td className="p-3 whitespace-nowrap">{a.category}</td>
+                          <td className="p-3 whitespace-nowrap">{[a.brand, a.model].filter(Boolean).join(' - ') || '-'}</td>
+                          <td className="p-3 whitespace-nowrap">{a.serialNumber || '-'}</td>
+                          <td className="p-3 whitespace-nowrap">{formatDate(a.assignedDate)}</td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                              backgroundColor: a.isActive?themeColors.success+'20':themeColors.textSecondary+'20',
+                              color: a.isActive?themeColors.success:themeColors.textSecondary
+                            }}>
+                              {a.status || (a.isActive ? 'Active' : 'Returned')}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
               )}
             </div>
           </div>
         </div>
-      )}
+      );
+    })()}
     </>
   );
 };
